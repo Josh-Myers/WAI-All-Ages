@@ -178,6 +178,7 @@ pred.test <- predict(neonate_model, neonate_validation.final, type="fitted")
 roc.test <- roc(neonate_validation.final$rs, pred.test, print.auc=TRUE, ci=TRUE, plot=TRUE, print.thres = c(0.1088, 0.2076, 0.3716, 0.4599882, 0.6, 0.7), col="purple", 
                 main="External Validation") # 0.12 is where se = sp, 0.32 is sp = 0.9
 auc(roc.test)
+# in development study apparent AUC was 0.88 and bias-corrected 0.85. This compares well with AUC of 0.84 found in validation study. 
 ci.auc(roc.test)
 
 y <- as.numeric(neonate_validation.final$rs) # needs to be numeric
