@@ -1,4 +1,5 @@
 ## neonate validation study
+library(plyr)
 library(dplyr)
 library(rms)
 library(ggplot2)
@@ -41,8 +42,11 @@ summary(neonate_validation.final$maternal.ethnicity)
 summary(neonate_validation.final$age.0.hrs)
 
 ## reference tests
+## 0 CNT results
 summary(neonate_validation.final$tymp)
+neonate_validation.final$tymp = droplevels(neonate_validation.final$tymp)
 summary(neonate_validation.final$dpoae)
+neonate_validation.final$dpoae = droplevels(neonate_validation.final$dpoae)
 summary(neonate_validation.final$aabr)
 
 # create reference standard 

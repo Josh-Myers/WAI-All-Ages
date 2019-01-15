@@ -2,8 +2,6 @@
 # One ear for development - opposite ears for validation (and also bootstrap as per Myers et al. 2018a)
 # WAI have developmental changes - option 1 is to create multiple models - where should the cut off be? The change is smooth
                                # - option 2 - model age - goal of this study
-# ordinal reference standard
-# compare with a model that doesn't include age - lowest aic wins
 
 library(dplyr)
 library(rms)
@@ -21,37 +19,93 @@ twelve.2 = readRDS('twelve.2.rds')
 twelve.24 = readRDS('twelve.24.rds')
 eighteen.2 = readRDS('eighteen.2.rds')
 eighteen.24 = readRDS('eighteen.24.rds')
-ages = readRDS('ages.rds')
 
-# Total of 710 subjects recruited at this stage
-# need to create reference standard and plot median pass/fail for each age
-
-six.2$age = 'Six months'
-six.24$age = 'Six months'
-twelve.2$age = 'Twelve months'
-twelve.24$age = 'Twelve months'
-eighteen.2$age = 'Eighteen months'
-eighteen.24$age = 'Eighteen months'
+six.2$age_group = 'Six months'
+six.24$age_group = 'Six months'
+twelve.2$age_group = 'Twelve months'
+twelve.24$age_group = 'Twelve months'
+eighteen.2$age_group = 'Eighteen months'
+eighteen.24$age_group = 'Eighteen months'
 
 # just use absorbance for this study
-six.2 = select(six.2, tymp:abs8000, age)
-six.24 = select(six.24, tymp:abs8000, age)
-twelve.2 = select(twelve.2, tymp:abs8000, age)
-twelve.24 = select(twelve.24, tymp:abs8000, age)
-eighteen.2 = select(eighteen.2, tymp:abs8000, age)
-eighteen.24 = select(eighteen.24, tymp:abs8000, age)
+six.2 = select(six.2, tymp:abs8000, age_group)
+six.24 = select(six.24, tymp:abs8000, age_group)
+twelve.2 = select(twelve.2, tymp:abs8000, age_group)
+twelve.24 = select(twelve.24, tymp:abs8000, age_group)
+eighteen.2 = select(eighteen.2, tymp:abs8000, age_group)
+eighteen.24 = select(eighteen.24, tymp:abs8000, age_group)
 
-# remove NA
-# get number who attended follow ups from longitudinal paper - then minus to get number of missing 
-six.2.final = drop_na(six.2, c(tymp, dpoae, abs250:abs8000))
-six.24.final = drop_na(six.24, c(tymp, dpoae, abs226:abs8000))
-twelve.2.final = drop_na(twelve.2, c(tymp, dpoae, abs250:abs8000))
-twelve.24.final = drop_na(twelve.24, c(tymp, dpoae, abs226:abs8000))
-eighteen.2.final = drop_na(eighteen.2, c(tymp, dpoae, abs250:abs8000))
-eighteen.24.final = drop_na(eighteen.24, c(tymp, dpoae, abs226:abs8000))
+# remove subjects who didn't attend
+six.2.final = drop_na(six.2, c(tymp, dpoae)) 
+six.24.final = drop_na(six.24, c(tymp, dpoae))
+twelve.2.final = drop_na(twelve.2, c(tymp, dpoae)) 
+twelve.24.final = drop_na(twelve.24, c(tymp, dpoae))
+eighteen.2.final = drop_na(eighteen.2, c(tymp, dpoae)) 
+eighteen.24.final = drop_na(eighteen.24, c(tymp, dpoae))
 
+# calculate number of infants who attended each follow up 
+six.mth.subjects =  length(unique(six.2.final$id.res)) # 271 infatns attended 6-mth review
+twelve.mth.subjects = length(unique(twelve.2.final$id.res)) # 180 infants attended 12-mth review
+eighteen.mth.subjects = length(unique(eighteen.2.final$id.res)) # 110 subjects attended 18-mth review
+
+# number of CNT
+tymp.cnt.6 = filter(six.2.final, tymp=='CNT') # CNT 18 ears
+dpoae.cnt.6 = filter(six.2.final, dpoae=='CNT') # CNT 22 ears
+wai.cnt.6 = filter(six.2.final, is.na(abs250)) # CNT 27 ears
+
+tymp.cnt.12 = filter(twelve.2.final, tymp=='CNT') # CNT 0 ears
+dpoae.cnt.12 = filter(twelve.2.final, dpoae=='CNT') # CNT 12 ears
+wai.cnt.12 = filter(twelve.2.final, is.na(abs250)) # CNT 16 ears
+
+tymp.cnt.18 = filter(eighteen.2.final, tymp=='CNT') # CNT 0 ears
+dpoae.cnt.18 = filter(eighteen.2.final, dpoae=='CNT') # CNT 8 ears
+wai.cnt.18 = filter(eighteen.2.final, is.na(abs250)) # CNT 9 ears
+
+# number of ears in sample
+# drop cnt and NA
+levels(six.2.final$tymp)[levels(six.2.final$tymp)=='CNT'] = NA
+levels(six.2.final$dpoae)[levels(six.2.final$dpoae)=='CNT'] = NA
+levels(twelve.2.final$tymp)[levels(twelve.2.final$tymp)=='CNT'] = NA
+levels(twelve.2.final$dpoae)[levels(twelve.2.final$dpoae)=='CNT'] = NA
+levels(eighteen.2.final$tymp)[levels(eighteen.2.final$tymp)=='CNT'] = NA
+levels(eighteen.2.final$dpoae)[levels(eighteen.2.final$dpoae)=='CNT'] = NA
+
+levels(six.24.final$tymp)[levels(six.24.final$tymp)=='CNT'] = NA
+levels(six.24.final$dpoae)[levels(six.24.final$dpoae)=='CNT'] = NA
+levels(twelve.24.final$tymp)[levels(twelve.24.final$tymp)=='CNT'] = NA
+levels(twelve.24.final$dpoae)[levels(twelve.24.final$dpoae)=='CNT'] = NA
+levels(eighteen.24.final$tymp)[levels(eighteen.24.final$tymp)=='CNT'] = NA
+levels(eighteen.24.final$dpoae)[levels(eighteen.24.final$dpoae)=='CNT'] = NA
+
+six.2.final = drop_na(six.2.final, c(tymp, dpoae, abs250:abs8000)) # 508 ears
+six.24.final = drop_na(six.24.final, c(tymp, dpoae, abs226:abs8000))
+twelve.2.final = drop_na(twelve.2.final, c(tymp, dpoae, abs250:abs8000)) # 330 ears
+twelve.24.final = drop_na(twelve.24.final, c(tymp, dpoae, abs226:abs8000))
+eighteen.2.final = drop_na(eighteen.2.final, c(tymp, dpoae, abs250:abs8000)) # 200 ears
+eighteen.24.final = drop_na(eighteen.24.final, c(tymp, dpoae, abs226:abs8000))
+
+# make tymp with negative peak 'type C' for 6 mths
+summary(six.2.final$tymp)
+# can't have NA in tpp = set to 0
+six.2.final$tpp[is.na(six.2.final$tpp)] = 0
+six.2.final = six.2.final %>% 
+  mutate(tymp = if_else(tpp < (-150), 'type C', if_else(tymp=='refer', 'refer', 'pass') ))
+  
+six.2.final$tymp = factor(six.2.final$tymp, levels = c('pass', 'type C', 'refer'))
+summary(six.2.final$tymp)
+
+# create df with all ages
 full.2 = rbind.data.frame(six.2.final, twelve.2.final, eighteen.2.final)
 full.24 = rbind.data.frame(six.24.final, twelve.24.final, eighteen.24.final)
+
+summary(full.2$age) # 42 missing age - impute with median for their age group
+full.2$age[full.2$age == 0] = NA
+
+## also need to check age for outliers - there are a couple of 18 mths with age 29 and 33 weeks - these are wrong
+
+# calculate age median, IQR and range for each age group
+# use dplyr group by for this
+
 
 # create reference standard
 full.2$rs <- with(full.2, 
@@ -84,7 +138,7 @@ full.24$rs <- with(full.24,
                   )
 )
 full.24$rs = factor(full.24$rs, levels=c('Normal', 'Mild', 'Severe'))
-summary(full.24$rs)
+summary(full.24$rs) 
 
 # plot median normal/mild/severe by age
 full.24 = select(full.24, abs226:rs)
@@ -108,7 +162,7 @@ abs.median.long$age = factor(abs.median.long$age, levels=c('Six months', 'Twelve
 abs.median.plot <- ggplot(abs.median.long, aes(x=Frequency, y=absorbance, colour=rs, linetype=age)) +
   geom_line()  +
   xlab("Frequency, Hz") +
-  scale_colour_manual(values = c("Pass" = "#00BA38", 
+  scale_colour_manual(values = c("Normal" = "#00BA38", 
                                  "Mild" = "#619CFF", 
                                  "Severe" = "#F8766D")) +
   ylab(expression(paste(italic("A")))) +
@@ -125,18 +179,13 @@ print(abs.median.plot)
 # modeling
 ## need a train and validation sample (one ear)
 # make df of ears that only have results for one ear
-full.2 = select(full.2, id.res:rs)
-full.2$ear.id = 1:909
-full.2 = group_by(full.2, age, id.res)
+full.2 = select(full.2, age:rs)
+full.2$ear.id = 1:1059
+full.2 = group_by(full.2, age_group, id.res)
 training = sample_n(full.2, 1)
 testing = full.2[-training$ear.id,]
 training <- ungroup(training)
 testing <- ungroup(testing)
-
-training$age = factor(training$age, levels=c('Six months', 'Twelve months', 'Eighteen months'))
-training$age = as.numeric(training$age)
-testing$age = factor(testing$age, levels=c('Six months', 'Twelve months', 'Eighteen months'))
-testing$age = as.numeric(testing$age)
 
 # check assumption of ordinality 
 # The solid lines are the simple stratified means, and the dashed lines are the expected values if the assumption of proportional odds is met. 
@@ -205,7 +254,7 @@ cal.plot.test.severe = val.prob(severe.preds, y.severe)
 plot(Predict(base_model.r, fun=plogis, kint = 1))
 plot(Predict(base_model.r, fun=plogis, kint = 2))
 
-## try to plot the age * freq interaction for the most important???
+## try to plot the age * freq interaction for the most important??? see neonate article
 
 ##########################
 # up to here
