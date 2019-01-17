@@ -1,15 +1,8 @@
-# Age independent model 6-18 months
-# One ear for development - opposite ears for validation (and also bootstrap as per Myers et al. 2018a)
-# WAI have developmental changes - option 1 is to create multiple models - where should the cut off be? The change is smooth
-                               # - option 2 - model age - goal of this study
-
-library(dplyr)
+# Age independent model 5-24 months
+library(tidyverse)
 library(rms)
-library(ggplot2)
-library(tidyr)
 library(cowplot)
 library(MyersMisc)
-library(pROC)
 theme_set(theme_bw(base_size = 10))
 
 # load model and data
@@ -20,12 +13,12 @@ twelve.24 = readRDS('twelve.24.rds')
 eighteen.2 = readRDS('eighteen.2.rds')
 eighteen.24 = readRDS('eighteen.24.rds')
 
-six.2$age_group = 'Six months'
-six.24$age_group = 'Six months'
-twelve.2$age_group = 'Twelve months'
-twelve.24$age_group = 'Twelve months'
-eighteen.2$age_group = 'Eighteen months'
-eighteen.24$age_group = 'Eighteen months'
+six.2$age_group = '6 months'
+six.24$age_group = '6 months'
+twelve.2$age_group = '12 months'
+twelve.24$age_group = '12 months'
+eighteen.2$age_group = '18 months'
+eighteen.24$age_group = '18 months'
 
 # just use absorbance for this study
 six.2 = select(six.2, tymp:abs8000, age_group)
@@ -35,7 +28,7 @@ twelve.24 = select(twelve.24, tymp:abs8000, age_group)
 eighteen.2 = select(eighteen.2, tymp:abs8000, age_group)
 eighteen.24 = select(eighteen.24, tymp:abs8000, age_group)
 
-# remove subjects who didn't attend
+# remove subjects who didn't attend follow up appointments
 six.2.final = drop_na(six.2, c(tymp, dpoae)) 
 six.24.final = drop_na(six.24, c(tymp, dpoae))
 twelve.2.final = drop_na(twelve.2, c(tymp, dpoae)) 
@@ -98,14 +91,28 @@ summary(six.2.final$tymp)
 full.2 = rbind.data.frame(six.2.final, twelve.2.final, eighteen.2.final)
 full.24 = rbind.data.frame(six.24.final, twelve.24.final, eighteen.24.final)
 
-summary(full.2$age) # 42 missing age - impute with median for their age group
+# ages of infants
+# some obviously wrong values - set to missing
 full.2$age[full.2$age == 0] = NA
+full.2$age[full.2$id.res == 36 & full.2$age_group == '18 months'] = NA
+full.2$age[full.2$id.res == 581 & full.2$age_group == '18 months'] = NA
+full.2$age_group = factor(full.2$age_group, levels = c('6 months', '12 months', '18 months'))
 
-## also need to check age for outliers - there are a couple of 18 mths with age 29 and 33 weeks - these are wrong
+summary(full.2$age) # 54 missing age - impute with median for their age group
+age.stats = full.2 %>% 
+  group_by(age_group) %>%
+  summarise(min = min(age, na.rm = TRUE), 
+            first.quartile = quantile(age, 0.25, na.rm = TRUE), 
+            median = median(age, na.rm = TRUE), 
+            third.quartile = quantile(age, 0.75, na.rm = TRUE), 
+            max = max(age, na.rm = TRUE))
+age.stats # median, IQR and range of age for each age group
 
-# calculate age median, IQR and range for each age group
-# use dplyr group by for this
-
+# impute age NAs with the median for their age group (6mth = 28, 12mth = 54.4, 18mth = 80.6)
+impute.median <- function(x) replace(x, is.na(x), median(x, na.rm = TRUE))
+full.2 = full.2 %>%
+  group_by(age_group) %>%
+  mutate(age = impute.median(age))
 
 # create reference standard
 full.2$rs <- with(full.2, 
@@ -141,8 +148,8 @@ full.24$rs = factor(full.24$rs, levels=c('Normal', 'Mild', 'Severe'))
 summary(full.24$rs) 
 
 # plot median normal/mild/severe by age
-full.24 = select(full.24, abs226:rs)
-colnames(full.24) = c("226.00", "257.33", "280.62", "297.30", "324.21", "343.49", "363.91", "385.55", "408.48", "432.77", "458.50",
+abs.24 = select(full.24, abs226:rs)
+colnames(abs.24) = c("226.00", "257.33", "280.62", "297.30", "324.21", "343.49", "363.91", "385.55", "408.48", "432.77", "458.50",
               "471.94", "500.00", "514.65", "545.25", "561.23", "577.68", "594.60", "629.96", "648.42", "667.42", "686.98",
               "707.11", "727.83", "749.15", "771.11", "793.70", "816.96", "840.90", "865.54", "890.90", "917.00", "943.87",
               "971.53", "1000.00", "1029.30", "1059.46", "1090.51", "1122.46", "1155.35", "1189.21", "1224.05", "1259.92", 
@@ -153,11 +160,11 @@ colnames(full.24) = c("226.00", "257.33", "280.62", "297.30", "324.21", "343.49"
               "4000.00", "4117.21", "4237.85", "4362.03", "4489.85", "4621.41", "4756.83", "4896.21", "5039.68", "5187.36",
               "5339.36", "5495.81", "5656.85", "5822.61", "5993.23", "6168.84", "6349.60", "6535.66", "6727.17", "6924.29",
               "7127.19", "7336.03", "7550.99", "7772.26", "8000.00", "age", "rs")
-full.24 <- group_by(full.24, age, rs)
-abs.median <- summarise_all(full.24, funs(median))
+abs.24 <- group_by(abs.24, age, rs)
+abs.median <- summarise_all(abs.24, funs(median))
 abs.median.long <- gather(abs.median, Frequency, absorbance, 3:109)
 abs.median.long$Frequency = as.numeric(abs.median.long$Frequency)
-abs.median.long$age = factor(abs.median.long$age, levels=c('Six months', 'Twelve months', 'Eighteen months'))
+abs.median.long$age = factor(abs.median.long$age, levels=c('6 months', '12 months', '18 months'))
 
 abs.median.plot <- ggplot(abs.median.long, aes(x=Frequency, y=absorbance, colour=rs, linetype=age)) +
   geom_line()  +
@@ -176,11 +183,363 @@ abs.median.plot <- ggplot(abs.median.long, aes(x=Frequency, y=absorbance, colour
   theme(legend.title=element_blank())
 print(abs.median.plot)
 
+# Create the 90% normal range (1/24 octave) for each age group for the example plots and app
+# 6 mth
+norm.6 = filter(full.24, age_group == '6 months')
+norm.6 = select(norm.6, abs226:abs8000, rs)
+norm.6 <- group_by(norm.6, rs)
+abs.median <- summarise_all(norm.6, funs(median))
+abs.05 <- summarise_all(norm.6, funs(quantile(., probs = (0.05))))
+abs.95 <- summarise_all(norm.6, funs(quantile(., probs = (0.95))))
+abs.90 <- rbind(abs.median, abs.05, abs.95)
+abs.90 <- data.frame(abs.90)
+colnames(abs.90) <- c("rs", "226.00", "257.33", "280.62", "297.30", "324.21", "343.49", "363.91", "385.55", "408.48", "432.77", "458.50",
+                      "471.94", "500.00", "514.65", "545.25", "561.23", "577.68", "594.60", "629.96", "648.42", "667.42", "686.98",
+                      "707.11", "727.83", "749.15", "771.11", "793.70", "816.96", "840.90", "865.54", "890.90", "917.00", "943.87",
+                      "971.53", "1000.00", "1029.30", "1059.46", "1090.51", "1122.46", "1155.35", "1189.21", "1224.05", "1259.92", 
+                      "1296.84", "1334.84", "1373.95", "1414.21", "1455.65", "1498.31", "1542.21", "1587.40", "1633.92", "1681.79",
+                      "1731.07", "1781.80", "1834.01", "1887.75", "1943.06", "2000.00", "2058.60", "2118.93", "2181.02", "2244.92",
+                      "2310.71", "2378.41", "2448.11", "2519.84", "2593.68", "2669.68", "2747.91", "2828.43", "2911.31", "2996.61",
+                      "3084.42", "3174.80", "3267.83", "3363.59", "3462.15", "3563.59", "3668.02", "3775.50", "3886.13", 
+                      "4000.00", "4117.21", "4237.85", "4362.03", "4489.85", "4621.41", "4756.83", "4896.21", "5039.68", "5187.36",
+                      "5339.36", "5495.81", "5656.85", "5822.61", "5993.23", "6168.84", "6349.60", "6535.66", "6727.17", "6924.29",
+                      "7127.19", "7336.03", "7550.99", "7772.26", "8000.00")
+
+stats.col <- c("median", "median", "median", "five", "five", "five", "ninety5", "ninety5", "ninety5")
+abs.90 <- cbind.data.frame(abs.90, stats.col)
+abs.90.long.6 <- gather(abs.90, Frequency, absorbance, 2:108)
+abs.90.long.6 <- spread(abs.90.long.6, stats.col, absorbance)
+abs.90.long.6$Frequency <- as.numeric(abs.90.long.6$Frequency)
+abs.90.long.6$rs = as.character(abs.90.long.6$rs)
+
+# filter normal
+abs.90.long.6 = filter(abs.90.long.6, rs == 'Normal')
+
+# plot to check it looks right
+abs.90.plot <- ggplot(abs.90.long.6, aes(x=Frequency, y=median, ymin=five, ymax=ninety5)) +
+  geom_ribbon(linetype=0, alpha = 0.4) +
+  scale_fill_grey(start=0.6, end=0.2) +
+  geom_line(size=0.8)  +
+  xlab("Frequency, Hz") +
+  ylab("Absorbance") +
+  scale_x_log10(expand=c(0, 0), breaks=c(226, 500, 1000, 2000, 4000, 8000))  +
+  scale_y_continuous(expand=c(0, 0), breaks=c(0, 0.2, 0.4, 0.6, 0.8, 1), limits=c(0, 1)) +
+  theme(legend.title=element_blank(), legend.text=element_text(size=10), legend.justification=c(0,1), 
+        legend.position=c(0.03, 0.97)) +
+  theme(axis.title.y = element_text(vjust = 0.6)) +
+  theme(plot.margin=unit(c(0.5, 0.8, 0.1, 0.5),"lines")) 
+#theme(legend.position="none")
+print(abs.90.plot)
+
+# save 90% range for the app
+saveRDS(abs.90.long.6, "sixMth90range.rds")
+
+# 12 mths
+norm.6 = filter(full.24, age_group == '6 months')
+norm.6 = select(norm.6, abs226:abs8000, rs)
+norm.6 <- group_by(norm.6, rs)
+abs.median <- summarise_all(norm.6, funs(median))
+abs.05 <- summarise_all(norm.6, funs(quantile(., probs = (0.05))))
+abs.95 <- summarise_all(norm.6, funs(quantile(., probs = (0.95))))
+abs.90 <- rbind(abs.median, abs.05, abs.95)
+abs.90 <- data.frame(abs.90)
+colnames(abs.90) <- c("rs", "226.00", "257.33", "280.62", "297.30", "324.21", "343.49", "363.91", "385.55", "408.48", "432.77", "458.50",
+                      "471.94", "500.00", "514.65", "545.25", "561.23", "577.68", "594.60", "629.96", "648.42", "667.42", "686.98",
+                      "707.11", "727.83", "749.15", "771.11", "793.70", "816.96", "840.90", "865.54", "890.90", "917.00", "943.87",
+                      "971.53", "1000.00", "1029.30", "1059.46", "1090.51", "1122.46", "1155.35", "1189.21", "1224.05", "1259.92", 
+                      "1296.84", "1334.84", "1373.95", "1414.21", "1455.65", "1498.31", "1542.21", "1587.40", "1633.92", "1681.79",
+                      "1731.07", "1781.80", "1834.01", "1887.75", "1943.06", "2000.00", "2058.60", "2118.93", "2181.02", "2244.92",
+                      "2310.71", "2378.41", "2448.11", "2519.84", "2593.68", "2669.68", "2747.91", "2828.43", "2911.31", "2996.61",
+                      "3084.42", "3174.80", "3267.83", "3363.59", "3462.15", "3563.59", "3668.02", "3775.50", "3886.13", 
+                      "4000.00", "4117.21", "4237.85", "4362.03", "4489.85", "4621.41", "4756.83", "4896.21", "5039.68", "5187.36",
+                      "5339.36", "5495.81", "5656.85", "5822.61", "5993.23", "6168.84", "6349.60", "6535.66", "6727.17", "6924.29",
+                      "7127.19", "7336.03", "7550.99", "7772.26", "8000.00")
+
+stats.col <- c("median", "median", "median", "five", "five", "five", "ninety5", "ninety5", "ninety5")
+abs.90 <- cbind.data.frame(abs.90, stats.col)
+abs.90.long.12 <- gather(abs.90, Frequency, absorbance, 2:108)
+abs.90.long.12 <- spread(abs.90.long.12, stats.col, absorbance)
+abs.90.long.12$Frequency <- as.numeric(abs.90.long.12$Frequency)
+abs.90.long.12$rs = as.character(abs.90.long.12$rs)
+
+# filter normal
+abs.90.long.12 = filter(abs.90.long.12, rs == 'Normal')
+
+# plot to check it looks right
+abs.90.plot <- ggplot(abs.90.long.12, aes(x=Frequency, y=median, ymin=five, ymax=ninety5)) +
+  geom_ribbon(linetype=0, alpha = 0.4) +
+  scale_fill_grey(start=0.6, end=0.2) +
+  geom_line(size=0.8)  +
+  xlab("Frequency, Hz") +
+  ylab("Absorbance") +
+  scale_x_log10(expand=c(0, 0), breaks=c(226, 500, 1000, 2000, 4000, 8000))  +
+  scale_y_continuous(expand=c(0, 0), breaks=c(0, 0.2, 0.4, 0.6, 0.8, 1), limits=c(0, 1)) +
+  theme(legend.title=element_blank(), legend.text=element_text(size=10), legend.justification=c(0,1), 
+        legend.position=c(0.03, 0.97)) +
+  theme(axis.title.y = element_text(vjust = 0.6)) +
+  theme(plot.margin=unit(c(0.5, 0.8, 0.1, 0.5),"lines")) 
+#theme(legend.position="none")
+print(abs.90.plot)
+
+# save 90% range for the app
+saveRDS(abs.90.long.12, "twelveMth90range.rds")
+
+# 18 mths
+norm.18 = filter(full.24, age_group == '18 months')
+norm.18 = select(norm.18, abs226:abs8000, rs)
+norm.18 <- group_by(norm.18, rs)
+abs.median <- summarise_all(norm.18, funs(median))
+abs.05 <- summarise_all(norm.18, funs(quantile(., probs = (0.05))))
+abs.95 <- summarise_all(norm.18, funs(quantile(., probs = (0.95))))
+abs.90 <- rbind(abs.median, abs.05, abs.95)
+abs.90 <- data.frame(abs.90)
+colnames(abs.90) <- c("rs", "226.00", "257.33", "280.62", "297.30", "324.21", "343.49", "363.91", "385.55", "408.48", "432.77", "458.50",
+                      "471.94", "500.00", "514.65", "545.25", "561.23", "577.68", "594.60", "629.96", "648.42", "667.42", "686.98",
+                      "707.11", "727.83", "749.15", "771.11", "793.70", "816.96", "840.90", "865.54", "890.90", "917.00", "943.87",
+                      "971.53", "1000.00", "1029.30", "1059.46", "1090.51", "1122.46", "1155.35", "1189.21", "1224.05", "1259.92", 
+                      "1296.84", "1334.84", "1373.95", "1414.21", "1455.65", "1498.31", "1542.21", "1587.40", "1633.92", "1681.79",
+                      "1731.07", "1781.80", "1834.01", "1887.75", "1943.06", "2000.00", "2058.60", "2118.93", "2181.02", "2244.92",
+                      "2310.71", "2378.41", "2448.11", "2519.84", "2593.68", "2669.68", "2747.91", "2828.43", "2911.31", "2996.61",
+                      "3084.42", "3174.80", "3267.83", "3363.59", "3462.15", "3563.59", "3668.02", "3775.50", "3886.13", 
+                      "4000.00", "4117.21", "4237.85", "4362.03", "4489.85", "4621.41", "4756.83", "4896.21", "5039.68", "5187.36",
+                      "5339.36", "5495.81", "5656.85", "5822.61", "5993.23", "6168.84", "6349.60", "6535.66", "6727.17", "6924.29",
+                      "7127.19", "7336.03", "7550.99", "7772.26", "8000.00")
+
+stats.col <- c("median", "median", "median", "five", "five", "five", "ninety5", "ninety5", "ninety5")
+abs.90 <- cbind.data.frame(abs.90, stats.col)
+abs.90.long.18 <- gather(abs.90, Frequency, absorbance, 2:108)
+abs.90.long.18 <- spread(abs.90.long.18, stats.col, absorbance)
+abs.90.long.18$Frequency <- as.numeric(abs.90.long.18$Frequency)
+abs.90.long.18$rs = as.character(abs.90.long.18$rs)
+
+# filter normal
+abs.90.long.18 = filter(abs.90.long.18, rs == 'Normal')
+
+# plot to check it looks right
+abs.90.plot <- ggplot(abs.90.long.18, aes(x=Frequency, y=median, ymin=five, ymax=ninety5)) +
+  geom_ribbon(linetype=0, alpha = 0.4) +
+  scale_fill_grey(start=0.6, end=0.2) +
+  geom_line(size=0.8)  +
+  xlab("Frequency, Hz") +
+  ylab("Absorbance") +
+  scale_x_log10(expand=c(0, 0), breaks=c(226, 500, 1000, 2000, 4000, 8000))  +
+  scale_y_continuous(expand=c(0, 0), breaks=c(0, 0.2, 0.4, 0.6, 0.8, 1), limits=c(0, 1)) +
+  theme(legend.title=element_blank(), legend.text=element_text(size=10), legend.justification=c(0,1), 
+        legend.position=c(0.03, 0.97)) +
+  theme(axis.title.y = element_text(vjust = 0.6)) +
+  theme(plot.margin=unit(c(0.5, 0.8, 0.1, 0.5),"lines")) 
+#theme(legend.position="none")
+print(abs.90.plot)
+
+# save 90% range for the app
+saveRDS(abs.90.long.18, "eighteenMth90range.rds")
+
 # modeling
-## need a train and validation sample (one ear)
+# calibration plot function for the test set----
+my.val.prob = function (p, y, logit, group, weights = rep(1, length(y)), normwt = FALSE, 
+                        pl = TRUE, smooth = TRUE, logistic.cal = TRUE, xlab = "Predicted Probability", 
+                        ylab = "Actual Probability", lim = c(0, 1), m, g, cuts, emax.lim = c(0, 
+                                                                                             1), legendloc = lim[1] + c(0.55 * diff(lim), 0.27 * diff(lim)), 
+                        statloc = c(0, 0.99), riskdist = NULL, 
+                        cex = 0.7, mkh = 0.02, connect.group = FALSE, connect.smooth = TRUE, 
+                        g.group = 4, evaluate = 100, nmin = 0) 
+{
+  if (missing(p)) 
+    p <- plogis(logit)
+  else logit <- qlogis(p)
+  if (length(p) != length(y)) 
+    stop("lengths of p or logit and y do not agree")
+  names(p) <- names(y) <- names(logit) <- NULL
+  riskdist <- match.arg(riskdist)
+  Spi <- function(p, y) {
+    z <- sum((y - p) * (1 - 2 * p))/sqrt(sum((1 - 2 * p) * 
+                                               (1 - 2 * p) * p * (1 - p)))
+    P <- 2 * pnorm(-abs(z))
+    c(Z = z, P = P)
+  }
+  if (!missing(group)) {
+    if (length(group) == 1 && is.logical(group) && group) 
+      group <- rep("", length(y))
+    if (!is.factor(group)) 
+      group <- if (is.logical(group) || is.character(group)) 
+        as.factor(group)
+    else cut2(group, g = g.group)
+    names(group) <- NULL
+    nma <- !(is.na(p + y + weights) | is.na(group))
+    ng <- length(levels(group))
+  }
+  else {
+    nma <- !is.na(p + y + weights)
+    ng <- 0
+  }
+  logit <- logit[nma]
+  y <- y[nma]
+  p <- p[nma]
+  if (ng > 0) {
+    group <- group[nma]
+    weights <- weights[nma]
+    return(val.probg(p, y, group, evaluate, weights, normwt, 
+                     nmin))
+  }
+  if (length(unique(p)) == 1) {
+    P <- mean(y)
+    Intc <- qlogis(P)
+    n <- length(y)
+    D <- -1/n
+    L01 <- -2 * sum(y * logit - logb(1 + exp(logit)), na.rm = TRUE)
+    L.cal <- -2 * sum(y * Intc - logb(1 + exp(Intc)), na.rm = TRUE)
+    U.chisq <- L01 - L.cal
+    U.p <- 1 - pchisq(U.chisq, 1)
+    U <- (U.chisq - 1)/n
+    Q <- D - U
+    spi <- unname(Spi(p, y))
+    stats <- c(0, 0.5, 0, D, 0, 1, U, U.chisq, U.p, Q, mean((y - 
+                                                               p[1])^2), Intc, 0, 0, 0, rep(abs(p[1] - P), 2), spi)
+    names(stats) <- c("Dxy", "C (ROC)", "R2", "D", "D:Chi-sq", 
+                      "D:p", "U", "U:Chi-sq", "U:p", "Q", "Brier", "Intercept", 
+                      "Slope", "Emax", "E90", "Eavg", "S:z", "S:p")
+    return(stats)
+  }
+  i <- !is.infinite(logit)
+  nm <- sum(!i)
+  if (nm > 0) 
+    warning(paste(nm, "observations deleted from logistic calibration due to probs. of 0 or 1"))
+  f.fixed <- lrm.fit(logit[i], y[i], initial = c(0, 1), maxit = 1L)
+  f.recal <- lrm.fit(logit[i], y[i])
+  stats <- f.fixed$stats
+  n <- stats["Obs"]
+  predprob <- seq(emax.lim[1], emax.lim[2], by = 5e-04)
+  Sm <- lowess(p, y, iter = 0)
+  cal.smooth <- approx(Sm, xout = p, ties = mean)$y
+  er <- abs(p - cal.smooth)
+  eavg <- mean(er)
+  emax <- max(er)
+  e90 <- unname(quantile(er, 0.9))
+  if (pl) {
+    plot(0.5, 0.5, xlim = lim, ylim = lim, type = "n", xlab = xlab, 
+         ylab = ylab)
+    abline(0, 1, lty = 2, lwd = 1, col = 'black')
+    lt <- 2
+    leg <- "Ideal"
+    marks <- -1
+    lwd <- 1
+    col <- 'black'
+    if (logistic.cal) {
+      lt <- c(lt, 1)
+      leg <- c(leg, "Logistic calibration")
+      lwd <- c(lwd, 1)
+      col <- c(col, "black")
+      marks <- c(marks, -1)
+    }
+    if (smooth) {
+      if (connect.smooth) {
+        lines(Sm, lty = 1)
+        lt <- c(lt, 3)
+        lwd <- c(lwd, 1)
+        col <- c(col, "black")
+        marks <- c(marks, -1)
+      }
+      else {
+        points(Sm)
+        lt <- c(lt, 0)
+        lwd <- c(lwd, 2)
+        col <- c(col, "black")
+        marks <- c(marks, 1)
+      }
+      leg <- c(leg, "Actual")
+    }
+    if (!missing(m) | !missing(g) | !missing(cuts)) {
+      if (!missing(m)) 
+        q <- cut2(p, m = m, levels.mean = TRUE, digits = 7)
+      else if (!missing(g)) 
+        q <- cut2(p, g = g, levels.mean = TRUE, digits = 7)
+      else if (!missing(cuts)) 
+        q <- cut2(p, cuts = cuts, levels.mean = TRUE, 
+                  digits = 7)
+      means <- as.numeric(levels(q))
+      prop <- tapply(y, q, function(x) mean(x, na.rm = TRUE))
+      points(means, prop, pch = 2)
+      if (connect.group) {
+        lines(means, prop)
+        lt <- c(lt, 1)
+      }
+      else lt <- c(lt, 0)
+      leg <- c(leg, "Grouped observations")
+      col <- c(col, "black")
+      lwd <- c(lwd, 1)
+      marks <- c(marks, 2)
+    }
+  }
+  lr <- stats["Model L.R."]
+  p.lr <- stats["P"]
+  D <- (lr - 1)/n
+  L01 <- -2 * sum(y * logit - logb(1 + exp(logit)), na.rm = TRUE)
+  U.chisq <- L01 - f.recal$deviance[2]
+  p.U <- 1 - pchisq(U.chisq, 2)
+  U <- (U.chisq - 2)/n
+  Q <- D - U
+  Dxy <- stats["Dxy"]
+  C <- stats["C"]
+  R2 <- stats["R2"]
+  B <- mean((p - y)^2)
+  spi <- unname(Spi(p, y))
+  stats <- c(Dxy, C, R2, D, lr, p.lr, U, U.chisq, p.U, Q, B, 
+             f.recal$coef, emax, e90, eavg, spi)
+  names(stats) <- c("Dxy", "C (ROC)", "R2", "D", "D:Chi-sq", 
+                    "D:p", "U", "U:Chi-sq", "U:p", "Q", "Brier", "Intercept", 
+                    "Slope", "Emax", "E90", "Eavg", "S:z", "S:p")
+  if (pl) {
+    logit <- seq(-7, 7, length = 200)
+    prob <- plogis(logit)
+    pred.prob <- f.recal$coef[1] + f.recal$coef[2] * logit
+    pred.prob <- plogis(pred.prob)
+    if (logistic.cal) 
+      lines(prob, pred.prob, lty = 1)
+    lp <- legendloc
+    if (!is.logical(lp)) {
+      if (!is.list(lp)) 
+        lp <- list(x = lp[1], y = lp[2])
+      legend(lp, leg, lty = c(2, 1), pch = marks, cex = cex, 
+             lwd = lwd, col = col, bty = "n")
+    }
+    if (!is.logical(statloc)) {
+      dostats <- c("Dxy", "C (ROC)", "R2", "D", "U", "Q", 
+                   "Brier", "Intercept", "Slope", "Emax", "E90", 
+                   "Eavg", "S:z", "S:p")
+      leg <- format(names(stats)[dostats])
+      leg <- paste(leg, ":", format(stats[dostats]), sep = "")
+      if (!is.list(statloc)) 
+        statloc <- list(x = statloc[1], y = statloc[2])
+      text(statloc, paste(format(names(stats[dostats])), 
+                          collapse = "\n"), adj = c(0, 1), cex = cex)
+      text(statloc$x + 0.225 * diff(lim), statloc$y, paste(format(round(stats[dostats], 
+                                                                        3)), collapse = "\n"), adj = c(1, 1), cex = cex)
+    }
+    if (is.character(riskdist)) {
+      if (riskdist == "calibrated") {
+        x <- f.recal$coef[1] + f.recal$coef[2] * qlogis(p)
+        x <- plogis(x)
+        x[p == 0] <- 0
+        x[p == 1] <- 1
+      }
+      else x <- p
+      bins <- seq(lim[1], lim[2], length = 101)
+      x <- x[x >= lim[1] & x <= lim[2]]
+      f <- table(cut(x, bins))
+      j <- f > 0
+      bins <- (bins[-101])[j]
+      f <- f[j]
+      f <- lim[1] + 0.15 * diff(lim) * f/max(f)
+      segments(bins, 0, bins, f)
+    }
+  }
+  stats
+}
+
+## need a train and validation sample (one ear)----
 # make df of ears that only have results for one ear
 full.2 = select(full.2, age:rs)
-full.2$ear.id = 1:1059
+full.2$ear.id = 1:1038
 full.2 = group_by(full.2, age_group, id.res)
 training = sample_n(full.2, 1)
 testing = full.2[-training$ear.id,]
@@ -219,87 +578,16 @@ age_aic
 
 # shrinkage coefficient for age model
 age_gamma = (290.83 - 20) / 290.83
-plot(anova(age_model.r))
 
+# choose best model
+aics = rbind(base_aic, age_aic) # age is lower - take as final model
+
+# save equation and model
 options(prType = 'plain') # change to "latex" if want latex output
 latex(age_model.r, file = "") # replace "abs" with: \textit{A}  and paste into Rsweave file then compile pdf
 saveRDS(age_model.r, 'AgeModel.rds')
 
-pred <- predict(age_model.r, type = "fitted")
-
-validate(age_model.r, B = 500)
-cal1 = calibrate(age_model.r, B = 500, kint = 1) # calibrate for Y >= Mild
-# it wouldn't let me set riskdist to "F" so I used the scat1d.opts - and set to 0 to supress the distribution of predictions in margin
-plot(cal1, scat1d.opts=list(nhistSpike=0, side=1, frac=0.00, tck=0), subtitles = F, xlab = "Predicted Probability", ylab = "Actual Probability")
-cal2 = calibrate(age_model.r, B = 500, kint = 2) # calibrate for Y >= Severe
-plot(cal2, scat1d.opts=list(nhistSpike=0, side=1, frac=0.00, tck=0), subtitles = F, xlab = "Predicted Probability", ylab = "Actual Probability")
-
-# validate opposite ears
-pred.opp_ears = as.data.frame(predict(age_model.r, testing, type = 'fitted'))
-mild.preds = pred.opp_ears[,1] # select predictions for >= Mild
-y.mild = as.numeric(testing$rs)
-y.mild <- replace(y.mild, y.mild==1, 0) # make normal 0, diseased 1
-y.mild <- replace(y.mild, y.mild==2, 1) 
-y.mild <- replace(y.mild, y.mild==3, 1) # set severe to mild 
-cal.plot.test.mild = val.prob(mild.preds, y.mild)
-
-severe.preds = pred.opp_ears[,2] # select predictions for >= Mild
-y.severe = as.numeric(testing$rs)
-y.severe <- replace(y.severe, y.severe==1, 0) # make normal 0, diseased 1
-y.severe <- replace(y.severe, y.severe==2, 0) # set mild to normal 
-y.severe <- replace(y.severe, y.severe==3, 1) 
-cal.plot.test.severe = val.prob(severe.preds, y.severe)
-
-
-plot(Predict(base_model.r, fun=plogis, kint = 1))
-plot(Predict(base_model.r, fun=plogis, kint = 2))
-
-## try to plot the age * freq interaction for the most important??? see neonate article
-
-##########################
-# up to here
-##########################
-
-
-jpeg("fig.3.cal.plots.jpeg", width = 10, height = 5 , units = 'in', res = 500)
-par(mar=c(5,5,2,2)+0.1)
-layout(matrix(c(1, 2), 1, 2, byrow = TRUE), widths = c(5,5), heights = c(5))
-#Mild Plot
-plot(cal1, scat1d.opts=list(nhistSpike=0, side=1, frac=0.00, tck=0), subtitles = F, legend = F, xlab = "Predicted Probability", ylab = "Actual Probability")
-legend("bottomright", inset = 0.05, box.lty=0, legend=c("Apparent", "Bias-corrected", "Ideal"),
-       col=c("Black", "black", "black"), lty=c(3,1,2), cex=0.8)
-mtext("A", 2, adj = 5, las = 1, padj = -10.4, font = 2, cex = 1.3)
-#Severe Plot
-plot(cal2, scat1d.opts=list(nhistSpike=0, side=1, frac=0.00, tck=0), subtitles = F, legend = F, xlab = "Predicted Probability", ylab = "Actual Probability")
-legend("bottomright", inset = 0.05, box.lty=0, legend=c("Apparent", "Bias-corrected", "Ideal"),
-       col=c("Black", "black", "black"), lty=c(3,1,2), cex=0.8)
-mtext("B", 2, adj = 5.5, las = 1, padj = -10.4, font = 2, cex = 1.3)
-dev.off()
-
-n <- sum(r$freq)
-quantile(predict(r, type='fitted'), c(100/n, 1-100/n), na.rm=TRUE)
-
-# resid(b, 'score.binary' , pl=TRUE) # they look ok - not too far from horizontal dashed line
-# resid(b, 'partial' , pl=TRUE , label.curves=FALSE)
-#plot(Predict(b, fun = plogis))
-
-# library(mRMRe) # use this for auc because proc uses a different method than rms 
-# rs.ordered = ordered(training$rs)
-# auc.train = correlate(rs.ordered, pred.train.penal, "cindex")
-# auc.train # this is the same as rms!
-
-# pred.test.penal <- predict(f, testing, type="lp")
-# # roc.test.penal <- multiclass.roc(testing$rs, pred.test.penal) 
-# # roc.test.penal 
-# 
-# rs.ordered.test = ordered(testing$rs)
-# auc.test = correlate(rs.ordered.test, pred.test.penal, "cindex")
-# auc.test 
-
-plot(Predict(r, fun = plogis,  kint = 1))
-plot(Predict(r, fun = plogis, kint = 2))
-
-val <- validate(r, B=500)
+val <- validate(age_model.r, B=500)
 full <- val[[1]]
 train <- val[[12]]
 test <- val[[23]]
@@ -316,14 +604,57 @@ auc.df <- c(auc.full, auc.train, auc.test, opt, opt.cor)
 auc.df.names <- c("full", "train", "test", "opt", "opt.cor")
 auc.res <- cbind.data.frame(auc.df.names, auc.df)
 
-# y <- as.numeric(df$rs) # needs to be numeric
-# y <- replace(y, y==1, 0)
-# y <- replace(y, y==2, 1)
-# cal.plot <- MyCalPlot(b.pred, y, smooth = T, logistic.cal = F, pl=T, riskdist = "predicted", statloc = F, 
-#                       legendloc=c(0.8,0.1), cex = 1)
+cal1 = calibrate(age_model.r, B = 500, kint = 1) # calibrate for Y >= Mild
+# it wouldn't let me set riskdist to "F" so I used the scat1d.opts - and set to 0 to supress the distribution of predictions in margin
+plot(cal1, scat1d.opts=list(nhistSpike=0, side=1, frac=0.00, tck=0), subtitles = F, xlab = "Predicted Probability", ylab = "Actual Probability")
+cal2 = calibrate(age_model.r, B = 500, kint = 2) # calibrate for Y >= Severe
+plot(cal2, scat1d.opts=list(nhistSpike=0, side=1, frac=0.00, tck=0), subtitles = F, xlab = "Predicted Probability", ylab = "Actual Probability")
+
+# validate with opposite ears
+pred.opp_ears = as.data.frame(predict(age_model.r, testing, type = 'fitted'))
+mild.preds = pred.opp_ears[,1] # select predictions for >= Mild
+y.mild = as.numeric(testing$rs)
+y.mild <- replace(y.mild, y.mild==1, 0) # make normal 0, diseased 1
+y.mild <- replace(y.mild, y.mild==2, 1) 
+y.mild <- replace(y.mild, y.mild==3, 1) # set severe to mild 
+mild.stats = val.prob(mild.preds, y.mild) # get the stats
+cal.plot.test.mild = my.val.prob(mild.preds, y.mild, logistic.cal = F, statloc = F)
+
+severe.preds = pred.opp_ears[,2] # select predictions for >= Mild
+y.severe = as.numeric(testing$rs)
+y.severe <- replace(y.severe, y.severe==1, 0) # make normal 0, diseased 1
+y.severe <- replace(y.severe, y.severe==2, 0) # set mild to normal 
+y.severe <- replace(y.severe, y.severe==3, 1) 
+severe.stats = val.prob(severe.preds, y.severe) # get the stats
+cal.plot.test.severe = my.val.prob(severe.preds, y.severe, logistic.cal = F, statloc = F)
+
+tiff("calPlot.jpeg", width = 10, height = 10, units = 'in', res = 500)
+layout(matrix(c(1, 2, 3, 4), 2, 2, byrow = TRUE), widths = c(5,5), heights = c(5,5))
+par(mar=c(4, 5, 1, 1))
+plot(cal1, scat1d.opts=list(nhistSpike=0, side=1, frac=0.00, tck=0), subtitles = F, legend = F, xlab = "Predicted Probability", ylab = "Actual Probability")
+legend("bottomright", inset = 0.05, box.lty=0, legend=c("Ideal", "Apparent", "Bias-corrected"),
+       col=c("Black", "black", "black"), lty=c(2,3,1), cex=1)
+mtext("A", 2, adj = 4.5, las = 1, padj = -12.4, font = 2, cex = 1.3)
+par(mar=c(4, 5, 1, 2))
+plot(cal2, scat1d.opts=list(nhistSpike=0, side=1, frac=0.00, tck=0), subtitles = F, legend = F, xlab = "Predicted Probability", ylab = "Actual Probability")
+legend("bottomright", inset = 0.05, box.lty=0, legend=c("Ideal", "Apparent", "Bias-corrected"),
+       col=c("Black", "black", "black"), lty=c(2,3,1), cex=1)
+mtext("B", 2, adj = 4.5, las = 1, padj = -12.4, font = 2, cex = 1.3)
+par(mar=c(5, 5, 1, 1))
+my.val.prob(mild.preds, y.mild, logistic.cal = F, statloc = F, cex = 1, legendloc = c(0.65, 0.15))
+mtext("C", 2, adj = 4.5, las = 1, padj = -12.4, font = 2, cex = 1.3)
+par(mar=c(5, 5, 1, 2))
+my.val.prob(severe.preds, y.severe, logistic.cal = F, statloc = F, cex = 1, legendloc = c(0.65, 0.15))
+mtext("D", 2, adj = 4.5, las = 1, padj = -12.4, font = 2, cex = 1.3)
+dev.off()
+
+# Interpret model
+plot(anova(age_model.r))
+plot(Predict(age_model.r, fun = plogis,  kint = 1))
+plot(Predict(age_model.r, fun = plogis, kint = 2))
 
 # predict class membership
-pred.ind = predict(r, type = "fitted.ind")
+pred.ind = predict(age_model.r, testing, type = "fitted.ind")
 pred.ind = as.data.frame(round(pred.ind, digits =2))
 # use some function to select the class with the highest prob (drop the other 2)
 
@@ -335,21 +666,20 @@ value <- pred.ind[cbind(1:nrow(pred.ind), max.pred)]
 cluster <- names(pred.ind)[max.pred]
 pred <- data.frame(value, cluster)
 pred$cluster = as.character(pred$cluster)
-pred$cluster[pred$cluster == "rs=Pass"] = "Pass"
+pred$cluster[pred$cluster == "rs=Normal"] = "Normal"
 pred$cluster[pred$cluster == "rs=Mild"] = "Mild"
 pred$cluster[pred$cluster == "rs=Severe"] = "Severe"
-pred$cluster = factor(pred$cluster, levels = c("Pass", "Mild", "Severe"))
+pred$cluster = factor(pred$cluster, levels = c("Normal", "Mild", "Severe"))
 
 # report the class and prob on the graph in the app
 
 ## compare to rs label 
-pred.compare = cbind(pred, abs.2$rs)
+pred.compare = cbind(pred, testing$rs)
 
-cont.tab = table(pred.compare$cluster, pred.compare$`abs.2$rs`) # columns are the original label (the truth), and rows are the max predictions
+cont.tab = table(pred.compare$cluster, pred.compare$`testing$rs`) # columns are the original label (the truth), and rows are the max predictions
 # explore any that the model said was normal, but RS said Severe
 
 # what is the median and range of predictions?
-detach(package:plyr)
 mean = pred.compare %>% 
   group_by(cluster) %>% 
   summarise(mean = mean(value)) 
@@ -366,10 +696,10 @@ max = pred.compare %>%
 max
 
 # predict class membership P >= j|X using 0.5 cutoff
-pred.fit = predict(r, type = "fitted")
+pred.fit = predict(age_model.r, testing, type = "fitted")
 pred.fit = as.data.frame(round(pred.fit, digits =2))
 names(pred.fit) = c("mild", "severe")
-pred.fit$rs = abs.2$rs
+pred.fit$rs = testing$rs
 pred.fit$label = NA
 
 pred.fit$label = with(pred.fit, 
@@ -379,18 +709,21 @@ pred.fit$label = factor(pred.fit$label, levels = c('Normal', 'Mild', 'Severe'))
 
 cont.tab2 = table(pred.fit$label, pred.fit$rs) # columns are the original label (the truth), and rows are the max predictions
 
-# example
-eg1 = filter(abs.2, sub.id==534, ear=="L") 
-eg.prob.ind1 = round(predict(r, eg1, type = "fitted.ind"), 2)
+
+
+
+# examples
+eg1 = filter(full.2, id.res==633, ear=="L") 
+eg.prob.ind1 = round(predict(age_model.r, eg1, type = "fitted.ind"), 2)
 eg.prob.ind1
-eg.prob.fit1 = round(predict(r, eg1, type = "fitted"), 2)
+eg.prob.fit1 = round(predict(age_model.r, eg1, type = "fitted"), 2)
 eg.prob.fit1
 prob.ind.norm1 = eg.prob.ind1[1]
 prob.ind.mild1 = eg.prob.ind1[2]
 prob.ind.sev1 = eg.prob.ind1[3]
 prob.fit.mild1 = eg.prob.fit1[1]
 prob.fit.sev1 = eg.prob.fit1[2]
-eg.abs1 = filter(abs.24, sub.id==534, ear=="L") 
+eg.abs1 = filter(full.24, id.res==633, ear=="L") 
 eg.abs1 = dplyr::select(eg.abs1, abs226:abs8000)
 freq.num = c(226.00, 257.33, 280.62, 297.30, 324.21, 343.49, 363.91, 385.55, 408.48, 432.77, 458.50,
              471.94, 500.00, 514.65, 545.25, 561.23, 577.68, 594.60, 629.96, 648.42, 667.42, 686.98,
