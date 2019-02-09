@@ -79,7 +79,7 @@ neonate_test.24 = drop_na(neonate_test.24, c(rs, abs226:pha8000))
 neonate_train.24$rs = revalue(neonate_train.24$rs, c('Pass'='Pass', 'Refer'='Fail'))
 neonate_test.24$rs = revalue(neonate_test.24$rs, c('Pass'='Pass', 'Refer'='Fail'))
 
-# median pass/fail training and test sets
+# mean pass/fail training and test sets
 wai.names = c("rs", "226.00", "257.33", "280.62", "297.30", "324.21", "343.49", "363.91", "385.55", "408.48", "432.77", "458.50",
               "471.94", "500.00", "514.65", "545.25", "561.23", "577.68", "594.60", "629.96", "648.42", "667.42", "686.98",
               "707.11", "727.83", "749.15", "771.11", "793.70", "816.96", "840.90", "865.54", "890.90", "917.00", "943.87",
@@ -108,13 +108,13 @@ colnames(pha.train.24) = wai.names
 colnames(pha.test.24) = wai.names
 
 abs.train.24$sample = 'Myers et al. (2018a)'
-abs.test.24$sample = 'Validation sample'
+abs.test.24$sample = 'This study'
 
 mag.train.24$sample = 'Myers et al. (2018a)'
-mag.test.24$sample = 'Validation sample'
+mag.test.24$sample = 'This study'
 
 pha.train.24$sample = 'Myers et al. (2018a)'
-pha.test.24$sample = 'Validation sample'
+pha.test.24$sample = 'This study'
 
 abs.24 = rbind.data.frame(abs.train.24, abs.test.24)
 mag.24 = rbind.data.frame(mag.train.24, mag.test.24)
@@ -124,19 +124,19 @@ abs.24 <- group_by(abs.24, sample, rs)
 mag.24 <- group_by(mag.24, sample, rs)
 pha.24 <- group_by(pha.24, sample, rs)
 
-abs.median <- summarise_all(abs.24, funs(median))
-mag.median <- summarise_all(mag.24, funs(median))
-pha.median <- summarise_all(pha.24, funs(median))
+abs.mean <- summarise_all(abs.24, funs(mean))
+mag.mean <- summarise_all(mag.24, funs(mean))
+pha.mean <- summarise_all(pha.24, funs(mean))
 
-abs.median.long <- gather(abs.median, Frequency, absorbance, 3:109)
-mag.median.long <- gather(mag.median, Frequency, magnitude, 3:109)
-pha.median.long <- gather(pha.median, Frequency, phase, 3:109)
+abs.mean.long <- gather(abs.mean, Frequency, absorbance, 3:109)
+mag.mean.long <- gather(mag.mean, Frequency, magnitude, 3:109)
+pha.mean.long <- gather(pha.mean, Frequency, phase, 3:109)
 
-abs.median.long$Frequency = as.numeric(abs.median.long$Frequency)
-mag.median.long$Frequency = as.numeric(mag.median.long$Frequency)
-pha.median.long$Frequency = as.numeric(pha.median.long$Frequency)
+abs.mean.long$Frequency = as.numeric(abs.mean.long$Frequency)
+mag.mean.long$Frequency = as.numeric(mag.mean.long$Frequency)
+pha.mean.long$Frequency = as.numeric(pha.mean.long$Frequency)
 
-abs.median.plot <- ggplot(abs.median.long, aes(x=Frequency, y=absorbance, colour=rs, linetype=sample)) +
+abs.mean.plot <- ggplot(abs.mean.long, aes(x=Frequency, y=absorbance, colour=rs, linetype=sample)) +
   geom_line()  +
   scale_color_manual(values=c("#00BA38", "#F8766D")) +
   xlab("Frequency, Hz") +
@@ -150,15 +150,15 @@ abs.median.plot <- ggplot(abs.median.long, aes(x=Frequency, y=absorbance, colour
   theme_bw() +
   theme(legend.position = 'none') +
   theme(plot.margin=unit(c(5,5,5,5),"mm"))
-print(abs.median.plot)
+print(abs.mean.plot)
 
-mag.median.plot <- ggplot(mag.median.long, aes(x=Frequency, y=magnitude, colour=rs, linetype=sample)) +
+mag.mean.plot <- ggplot(mag.mean.long, aes(x=Frequency, y=magnitude, colour=rs, linetype=sample)) +
   geom_line()  +
   scale_color_manual(values=c("#00BA38", "#F8766D")) +
   xlab("Frequency, Hz") +
   ylab(expression(paste("|", italic("Y"), "|,", " mmho"))) +
   scale_x_log10(expand=c(0, 0), breaks=c(226, 500, 1000, 2000, 4000, 8000))  +
-  scale_y_continuous(expand=c(0, 0), breaks=c(0, 1, 2, 3, 4), limits=c(0, 4)) +
+  scale_y_continuous(expand=c(0, 0), breaks=c(0, 1, 2, 3, 4, 5), limits=c(0, 5)) +
   theme(legend.title=element_blank(), legend.text=element_text(size=10), legend.justification=c(0,1), 
         legend.position=c(0.03, 0.97)) +
   theme(axis.title.y = element_text(vjust = 0.6)) +
@@ -169,7 +169,7 @@ mag.median.plot <- ggplot(mag.median.long, aes(x=Frequency, y=magnitude, colour=
   theme(axis.title.y = element_text(vjust = 0.6)) +
   theme(plot.margin=unit(c(5,5,5,5),"mm"))
 
-pha.median.plot <- ggplot(pha.median.long, aes(x=Frequency, y=phase, colour=rs, linetype=sample)) +
+pha.mean.plot <- ggplot(pha.mean.long, aes(x=Frequency, y=phase, colour=rs, linetype=sample)) +
   geom_line()  +
   scale_color_manual(values=c("#00BA38", "#F8766D")) +
   xlab("Frequency, Hz") +
@@ -183,10 +183,10 @@ pha.median.plot <- ggplot(pha.median.long, aes(x=Frequency, y=phase, colour=rs, 
   theme_bw() +
   theme(legend.position = 'none') +
   theme(plot.margin=unit(c(5,5,5,5),"mm"))
-print(pha.median.plot)
+print(pha.mean.plot)
 
-neonate_median_plots <- plot_grid(abs.median.plot, mag.median.plot, pha.median.plot, nrow=3, ncol=1, align = "v", labels = c("A", "B", "C")) 
-ggsave("neonate_median_plots.jpeg", neonate_median_plots, height=9, width=6, dpi=500)
+neonate_mean_plots <- plot_grid(abs.mean.plot, mag.mean.plot, pha.mean.plot, nrow=3, ncol=1, align = "v", labels = c("A", "B", "C")) 
+ggsave("neonate_mean_plots.jpeg", neonate_mean_plots, height=9, width=6, dpi=500)
 
 # Model predictions on the test set
 pred.test <- predict(neonate_model, neonate_validation.final, type="fitted")

@@ -1,4 +1,5 @@
 # Age independent model 5-24 months
+# munge and plot data----
 library(tidyverse)
 library(rms)
 library(cowplot)
@@ -146,7 +147,7 @@ twelve.24.final = drop_na(twelve.24.final, c(tymp, dpoae, abs226:abs8000))
 eighteen.2.final = drop_na(eighteen.2.final, c(tymp, dpoae, abs250:abs8000)) # 200 ears
 eighteen.24.final = drop_na(eighteen.24.final, c(tymp, dpoae, abs226:abs8000))
 
-# age median and range for each age group
+# age mean and range for each age group
 six.2.final$age[six.2.final$age < 1] = NA
 twelve.2.final$age[twelve.2.final$age < 1] = NA
 eighteen.2.final$age[eighteen.2.final$age < 40] = NA
@@ -257,7 +258,7 @@ dpoae.by.age = full.2 %>%
   group_by(age_group, dpoae) %>%
   tally()
 
-# plot median normal/mild/severe by age
+# plot mean normal/mild/severe by age
 abs.24 = select(full.24, abs226:rs)
 colnames(abs.24) = c("226.00", "257.33", "280.62", "297.30", "324.21", "343.49", "363.91", "385.55", "408.48", "432.77", "458.50",
               "471.94", "500.00", "514.65", "545.25", "561.23", "577.68", "594.60", "629.96", "648.42", "667.42", "686.98",
@@ -271,12 +272,12 @@ colnames(abs.24) = c("226.00", "257.33", "280.62", "297.30", "324.21", "343.49",
               "5339.36", "5495.81", "5656.85", "5822.61", "5993.23", "6168.84", "6349.60", "6535.66", "6727.17", "6924.29",
               "7127.19", "7336.03", "7550.99", "7772.26", "8000.00", "age", "rs")
 abs.24 <- group_by(abs.24, age, rs)
-abs.median <- summarise_all(abs.24, funs(mean))
-abs.median.long <- gather(abs.median, Frequency, absorbance, 3:109)
-abs.median.long$Frequency = as.numeric(abs.median.long$Frequency)
-abs.median.long$age = factor(abs.median.long$age, levels=c('6 months', '12 months', '18 months'))
+abs.mean <- summarise_all(abs.24, funs(mean))
+abs.mean.long <- gather(abs.mean, Frequency, absorbance, 3:109)
+abs.mean.long$Frequency = as.numeric(abs.mean.long$Frequency)
+abs.mean.long$age = factor(abs.mean.long$age, levels=c('6 months', '12 months', '18 months'))
 
-abs.median.plot <- ggplot(abs.median.long, aes(x=Frequency, y=absorbance, colour=rs, linetype=age)) +
+abs.mean.plot <- ggplot(abs.mean.long, aes(x=Frequency, y=absorbance, colour=rs, linetype=age)) +
   geom_line()  +
   xlab("Frequency, Hz") +
   scale_colour_manual(values = c("Normal" = "#00BA38", 
@@ -291,9 +292,9 @@ abs.median.plot <- ggplot(abs.median.long, aes(x=Frequency, y=absorbance, colour
   theme(plot.margin=unit(c(0.5, 0.8, 0.1, 0.5),"lines")) +
   theme_bw() +
   theme(legend.title=element_blank())
-print(abs.median.plot)
+print(abs.mean.plot)
 
-ggsave("median.plot.jpeg", abs.median.plot, height=4, width=7.5, dpi=500)
+ggsave("mean.plot.jpeg", abs.mean.plot, height=4, width=7.5, dpi=500)
 
 # Create the 90% normal range (1/24 octave) for each age group for the example plots and app
 # 6 mth
@@ -654,66 +655,84 @@ MyersMisc:::My.plot.xmean.ordinaly(rs ~ abs4000, cr=F, topcats=2, subn = F, data
 MyersMisc:::My.plot.xmean.ordinaly(rs ~ abs5657, cr=F, topcats=2, subn = F, data = full.2, xlab = "Reference Standard", ylab = "Absorbance 5657 Hz")
 dev.off()
 
+
+# modeling----
+set.seed(17)
 train.dd <- datadist(training)
 options(datadist="train.dd")
+
+label(training$abs1000) <- "Absorbance 1000 Hz"
+label(training$abs1414) <- "Absorbance 1414 Hz"
+label(training$abs2000) <- "Absorbance 2000 Hz"
+label(training$abs2828) <- "Absorbance 2828 Hz"
+label(training$abs4000) <- "Absorbance 4000 Hz"
+label(training$abs5657) <- "Absorbance 5657 Hz"
+label(training$age) <- "Age"
+units(training$age) <- "weeks"
+
+gamma = function (x, model.name='model.name') {
+  lrchi2 = x$stats[3]
+  df = x$stats[4]
+  gamma = (lrchi2 - df) / lrchi2
+  names(gamma) = model.name
+  gamma
+}
+
 base_model <- lrm(rs ~ abs1000 + abs1414 + abs2000 + abs2828 + abs4000 + abs5657, data = training, x = T, y = T)
 base_model.r = robcov(base_model, training$id.res) 
-base_model.r                              
 base_aic = AIC(base_model.r)
-base_aic # 581.35
-base_gamma = (300.42 - 6) / 300.42
+base_gamma = gamma(base_model.r, "base model")
 
 base_model.nl <- lrm(rs ~ rcs(abs1000, 5) + rcs(abs1414, 5) + rcs(abs2000, 5) + rcs(abs2828, 5) + rcs(abs4000, 5) + rcs(abs5657, 5), 
                      data = training, x = T, y = T)
 base_model.nl.r = robcov(base_model.nl, training$id.res) 
-base_model.nl.r                              
 base_aic.nl = AIC(base_model.nl.r)
-base_aic.nl # 557.0133
-base_gamma.nl = (360.75 - 24) / 360.75
+base_gamma.nl = gamma(base_model.nl.r, "base NL model")
 
 age_model = lrm(rs ~ age * (abs1000 + abs1414 + abs2000 + abs2828 + abs4000 + abs5657), data = training, x = T, y = T)
 age_model.r = robcov(age_model, training$id.res) 
-age_model.r                              
 age_aic = AIC(age_model.r)
-age_aic # 580.0675
-age_gamma = (315.70 - 13) / 315.70
+age_gamma = gamma(age_model.r, "age model")
 
 age_model.nl = lrm(rs ~ age * (rcs(abs1000, 5) + rcs(abs1414, 5) + rcs(abs2000, 5) + rcs(abs2828, 5) + rcs(abs4000, 5) + rcs(abs5657, 5)), 
                    data = training, x = T, y = T)
 age_model.nl.r = robcov(age_model.nl, training$id.res) 
-age_model.nl.r                              
 age_aic.nl = AIC(age_model.nl.r)
-age_aic.nl # 565.145
-age_nl.gamma = (402.62 - 49) / 402.62 # <0.9 so overfitting - don't use
+age_nl.gamma = gamma(age_model.nl.r, "age NL model")
 
 # interaction = age * (3 and 4kHz)
 age_model.semi_nl = lrm(rs ~ rcs(abs1000, 5) + rcs(abs1414, 5) + rcs(abs2000, 5) + rcs(abs5657, 5) + age * (rcs(abs4000, 5) + rcs(abs2828)), 
-                   data = training, x = T, y = T)
+                        data = training, x = T, y = T)
 age_model.semi_nl.r = robcov(age_model.semi_nl, training$id.res) 
-age_model.semi_nl.r                              
 age_aic.semi_nl = AIC(age_model.semi_nl.r)
-age_aic.semi_nl # 547.5753
-age_semi.nl.gamma = (388.19 - 33) / 388.19 # 0.91
+age_semi.nl.gamma = gamma(age_model.semi_nl.r, "age semiNL model")
 
 # or remove 3 and 4 kHz
-base_model.no4k = lrm(rs ~ rcs(abs1000, 5) + rcs(abs1414, 5) + rcs(abs2000, 5) + rcs(abs5657, 5), 
-                        data = training, x = T, y = T)
-base_model.no4k.r = robcov(base_model.no4k, training$id.res) 
-base_model.no4k.r                              
-base_aic.no4k = AIC(base_model.no4k.r)
-base_aic.no4k # 550.4903
-base_no4k.gamma = (351.28 - 16) / 351.28 # 0.94
+base_model.no34k = lrm(rs ~ rcs(abs1000, 5) + rcs(abs1414, 5) + rcs(abs2000, 5) + rcs(abs5657, 5), 
+                      data = training, x = T, y = T)
+base_model.no34k.r = robcov(base_model.no34k, training$id.res) 
+base_aic.no34k = AIC(base_model.no34k.r)
+base_no34k.gamma = gamma(base_model.no34k.r, "base model NL no34k")
 
 # choose best model
-aics = rbind(base_aic, base_aic.nl, age_aic, age_aic.nl, age_aic.semi_nl, base_aic.no4k) 
-gammas = rbind(base_gamma, base_gamma.nl, age_gamma, age_nl.gamma, age_semi.nl.gamma, base_no4k.gamma)
+aics = rbind(base_aic, base_aic.nl, age_aic, age_aic.nl, age_aic.semi_nl, base_aic.no34k) 
+gammas = rbind(base_gamma, base_gamma.nl, age_gamma, age_nl.gamma, age_semi.nl.gamma, base_no34k.gamma)
+
+final_model = base_model.no34k.r
 
 # save equation and model
 options(prType = 'plain') # change to "latex" if want latex output
-latex(age_model.semi_nl.r, file = "") # replace "abs" with: \textit{A}  and paste into Rsweave file then compile pdf
-saveRDS(age_model.semi_nl.r, 'AgeModel.rds')
+latex(final_model, file = "") # replace "abs" with: \textit{A}  and paste into Rsweave file then compile pdf
+saveRDS(final_model, 'InfantModel.rds')
 
-val <- validate(age_model.semi_nl.r, B=500)
+# explore/interpret final model 
+anova(final_model)
+plot(anova(final_model, vnames='labels'), 'chisq', rm.totals = T)
+
+plot(Predict(final_model, fun = plogis, kint = 1))
+plot(Predict(final_model, fun = plogis, kint = 2))
+
+val <- validate(final_model, B=500)
 full <- val[[1]]
 train <- val[[12]]
 test <- val[[23]]
@@ -730,14 +749,14 @@ auc.df <- c(auc.full, auc.train, auc.test, opt, opt.cor)
 auc.df.names <- c("full", "train", "test", "opt", "opt.cor")
 auc.res <- cbind.data.frame(auc.df.names, auc.df)
 
-cal1 = calibrate(age_model.semi_nl.r, B = 500, kint = 1) # calibrate for Y >= Mild
+cal1 = calibrate(final_model, B = 500, kint = 1) # calibrate for Y >= Mild
 # it wouldn't let me set riskdist to "F" so I used the scat1d.opts - and set to 0 to supress the distribution of predictions in margin
 plot(cal1, scat1d.opts=list(nhistSpike=0, side=1, frac=0.00, tck=0), subtitles = F, xlab = "Predicted Probability", ylab = "Actual Probability")
-cal2 = calibrate(age_model.semi_nl.r, B = 500, kint = 2) # calibrate for Y >= Severe
+cal2 = calibrate(final_model, B = 500, kint = 2) # calibrate for Y >= Severe
 plot(cal2, scat1d.opts=list(nhistSpike=0, side=1, frac=0.00, tck=0), subtitles = F, xlab = "Predicted Probability", ylab = "Actual Probability")
 
 # validate with opposite ears
-pred.opp_ears = as.data.frame(predict(age_model.semi_nl.r, testing, type = 'fitted'))
+pred.opp_ears = as.data.frame(predict(final_model, testing, type = 'fitted'))
 mild.preds = pred.opp_ears[,1] # select predictions for >= Mild
 y.mild = as.numeric(testing$rs)
 y.mild <- replace(y.mild, y.mild==1, 0) # make normal 0, diseased 1
@@ -746,6 +765,8 @@ y.mild <- replace(y.mild, y.mild==3, 1) # set severe to mild
 mild.stats = val.prob(mild.preds, y.mild) # get the stats
 cal.plot.test.mild = my.val.prob(mild.preds, y.mild, logistic.cal = F, statloc = F)
 
+val.prob(mild.preds, y.mild, logistic.cal = F) # get c-index (>= mild)
+
 severe.preds = pred.opp_ears[,2] # select predictions for >= Mild
 y.severe = as.numeric(testing$rs)
 y.severe <- replace(y.severe, y.severe==1, 0) # make normal 0, diseased 1
@@ -753,6 +774,8 @@ y.severe <- replace(y.severe, y.severe==2, 0) # set mild to normal
 y.severe <- replace(y.severe, y.severe==3, 1) 
 severe.stats = val.prob(severe.preds, y.severe) # get the stats
 cal.plot.test.severe = my.val.prob(severe.preds, y.severe, logistic.cal = F, statloc = F)
+
+val.prob(severe.preds, y.severe, logistic.cal = F) # get c-index for >=severe
 
 tiff("calPlot.jpeg", width = 10, height = 10, units = 'in', res = 500)
 layout(matrix(c(1, 2, 3, 4), 2, 2, byrow = TRUE), widths = c(5,5), heights = c(5,5))
@@ -774,13 +797,8 @@ my.val.prob(severe.preds, y.severe, logistic.cal = F, statloc = F, cex = 1, lege
 mtext("D", 2, adj = 4.5, las = 1, padj = -12.4, font = 2, cex = 1.3)
 dev.off()
 
-# Interpret model
-plot(anova(age_model.semi_nl.r))
-plot(Predict(age_model.semi_nl.r, fun = plogis,  kint = 1))
-plot(Predict(age_model.semi_nl.r, fun = plogis, kint = 2))
-
-# predict class membership
-pred.ind = predict(age_model.semi_nl.r, testing, type = "fitted.ind")
+# predict class membership in the test set
+pred.ind = predict(final_model, testing, type = "fitted.ind")
 pred.ind = as.data.frame(round(pred.ind, digits =2))
 # use some function to select the class with the highest prob (drop the other 2)
 
@@ -797,13 +815,10 @@ pred$cluster[pred$cluster == "rs=Mild"] = "Mild"
 pred$cluster[pred$cluster == "rs=Severe"] = "Severe"
 pred$cluster = factor(pred$cluster, levels = c("Normal", "Mild", "Severe"))
 
-# report the class and prob on the graph in the app
-
 ## compare to rs label 
 pred.compare = cbind(pred, testing$rs)
 
 cont.tab = table(pred.compare$cluster, pred.compare$`testing$rs`) # columns are the original label (the truth), and rows are the max predictions
-# explore any that the model said was normal, but RS said Severe
 
 # what is the median and range of predictions?
 mean = pred.compare %>% 
@@ -821,32 +836,23 @@ max = pred.compare %>%
   summarise(max = max(value)) 
 max
 
-# predict class membership P >= j|X using 0.5 cutoff
-pred.fit = predict(age_model.semi_nl.r, testing, type = "fitted")
-pred.fit = as.data.frame(round(pred.fit, digits =2))
-names(pred.fit) = c("mild", "severe")
-pred.fit$rs = testing$rs
-pred.fit$label = NA
-
-pred.fit$label = with(pred.fit, 
-                      ifelse(severe > 0.5, "Severe",
-                             ifelse(severe < 0.5 & mild < 0.5, "Normal", "Mild")))
-pred.fit$label = factor(pred.fit$label, levels = c('Normal', 'Mild', 'Severe'))
-
-cont.tab2 = table(pred.fit$label, pred.fit$rs) # columns are the original label (the truth), and rows are the max predictions
-
 # examples
-eg1 = filter(full.2, id.res==633, ear=="L") 
-eg.prob.ind1 = round(predict(age_model.semi_nl.r, eg1, type = "fitted.ind"), 2)
+id = "421" 
+ear.side = "R"
+age.group = "18 months"
+
+eg1 = filter(full.2, id.res==id, ear==ear.side, age_group==age.group) 
+eg.prob.ind1 = round(predict(final_model, eg1, type = "fitted.ind"), 2)
 eg.prob.ind1
-eg.prob.fit1 = round(predict(age_model.semi_nl.r, eg1, type = "fitted"), 2)
-eg.prob.fit1
+eg.prob.fit1 = round(predict(final_model, eg1, type = "fitted"), 2)
+eg.mild = eg.prob.fit1[1]
+eg.severe = eg.prob.fit1[2]
 prob.ind.norm1 = eg.prob.ind1[1]
 prob.ind.mild1 = eg.prob.ind1[2]
 prob.ind.sev1 = eg.prob.ind1[3]
 prob.fit.mild1 = eg.prob.fit1[1]
 prob.fit.sev1 = eg.prob.fit1[2]
-eg.abs1 = filter(full.24, id.res==633, ear=="L") 
+eg.abs1 = filter(full.24, id.res==id, ear==ear.side, age_group==age.group) 
 eg.abs1 = dplyr::select(eg.abs1, abs226:abs8000)
 freq.num = c(226.00, 257.33, 280.62, 297.30, 324.21, 343.49, 363.91, 385.55, 408.48, 432.77, 458.50,
              471.94, 500.00, 514.65, 545.25, 561.23, 577.68, 594.60, 629.96, 648.42, 667.42, 686.98,
@@ -863,12 +869,13 @@ names(eg.abs1) = freq.num
 eg.abs.long1 <- gather(eg.abs1, Frequency, Absorbance, 1:107)
 eg.abs.long1$Frequency = as.numeric(eg.abs.long1$Frequency)
 
+# Right ear 23-mth male with type B and passed DPOAE
 eg.plot.1 = ggplot(eg.abs.long1) +
   scale_x_log10(expand=c(0, 0), breaks=c(226, 500, 1000, 2000, 4000, 8000))  +
-  geom_line(aes(x= Frequency, y=Absorbance), data = eg.abs.long1, colour="blue") +
+  geom_line(aes(x= Frequency, y=Absorbance), data = eg.abs.long1, colour="red") +
   geom_ribbon(data=abs.90.long.18, aes(x = Frequency, ymin = five, ymax = ninety5, linetype=NA), alpha = 0.2, show.legend = F) +
   xlab("Frequency, Hz") +
-  ylab("Absorbance") +
+  ylab(expression(paste(italic("A")))) +
   scale_y_continuous(expand=c(0, 0), breaks=c(0, 0.2, 0.4, 0.6, 0.8, 1), limits=c(0, 1)) +
   theme(legend.text=element_text(size=10), legend.justification=c(0,1)) +
   theme(axis.title.y = element_text(vjust = 0.6)) +
@@ -876,12 +883,18 @@ eg.plot.1 = ggplot(eg.abs.long1) +
   theme(plot.title = element_text(hjust = 0.5)) +
   theme(plot.title = element_text(lineheight=.8, face="bold")) +
   theme(plot.title = element_text(vjust=2)) +
-  annotate("text", x = 250, y = c(0.90), label = ("Left ear of a 79-week-old male"), hjust = 0) +
-  annotate("text", x = 250, y = c(0.80), label = ("'ME' >= ~'mild'~ 0.96"), parse=TRUE, hjust=0) +
-  annotate("text", x = 250, y = c(0.70), label = ("'ME' >= ~'severe'~ 0.76"), parse=TRUE, hjust=0) +
-  annotate("text", x = 250, y = c(0.60), label = paste("Normal = ",  prob.ind.norm1), parse=F, hjust=0) +
-  annotate("text", x = 250, y = c(0.50), label = paste("Mild = ",  prob.ind.mild1), parse=F, hjust=0) +
-  annotate("text", x = 250, y = c(0.40), label = paste("Severe = ",  prob.ind.sev1), parse=F, hjust=0) 
+  annotate("text", x = 250, y = c(0.90), label = ("Right ear of a 23-month-old male"), hjust = 0) +
+  annotate("text", x = 250, y = c(0.80), label = paste("ME \u2265 mild", eg.mild), parse=F, hjust=0) +
+  annotate("text", x = 250, y = c(0.70), label = paste("ME \u2265 severe", eg.severe), parse=F, hjust=0) 
+  #annotate("text", x = 250, y = c(0.60), label = paste("Normal = ",  prob.ind.norm1), parse=F, hjust=0) +
+  #annotate("text", x = 250, y = c(0.50), label = paste("Mild = ",  prob.ind.mild1), parse=F, hjust=0) +
+  #annotate("text", x = 250, y = c(0.40), label = paste("Severe = ",  prob.ind.sev1), parse=F, hjust=0) 
 eg.plot.1
 
 ggsave("eg.plot.jpeg", eg.plot.1, height=4, width=6, dpi=500)
+
+# RCS knot locations - 0.05, 0.275, 0.5, 0.725, and 0.95 percentiles
+knots1k = quantile(training$abs1000, probs = c(0.05, 0.275, 0.5, 0.725, 0.95))
+knots1.4k = quantile(training$abs1414, probs = c(0.05, 0.275, 0.5, 0.725, 0.95))
+knots2k = quantile(training$abs2000, probs = c(0.05, 0.275, 0.5, 0.725, 0.95))
+knots6k = quantile(training$abs5657, probs = c(0.05, 0.275, 0.5, 0.725, 0.95))
