@@ -237,7 +237,7 @@ full.24$rs <- with(full.24,
                                 )
                          )
                   )
-)
+                  )
 full.24$rs = factor(full.24$rs, levels=c('Normal', 'Mild', 'Severe'))
 summary(full.24$rs) 
 
@@ -276,6 +276,7 @@ abs.mean <- summarise_all(abs.24, funs(mean))
 abs.mean.long <- gather(abs.mean, Frequency, absorbance, 3:109)
 abs.mean.long$Frequency = as.numeric(abs.mean.long$Frequency)
 abs.mean.long$age = factor(abs.mean.long$age, levels=c('6 months', '12 months', '18 months'))
+abs.mean.long$absorbance[abs.mean.long$absorbance < 0] = 0
 
 abs.mean.plot <- ggplot(abs.mean.long, aes(x=Frequency, y=absorbance, colour=rs, linetype=age)) +
   geom_line()  +
@@ -293,8 +294,74 @@ abs.mean.plot <- ggplot(abs.mean.long, aes(x=Frequency, y=absorbance, colour=rs,
   theme_bw() +
   theme(legend.title=element_blank())
 print(abs.mean.plot)
+#ggsave("mean.plot.jpeg", abs.mean.plot, height=4, width=7.5, dpi=500)
 
-ggsave("mean.plot.jpeg", abs.mean.plot, height=4, width=7.5, dpi=500)
+# RS all possible
+rs.all.names = c("Pass both, n = 769", "Type A and fail DPOAEs, n = 35", "Type C and pass DPOAEs, n = 21", 
+                 "Type C and fail DPOAEs, n = 6", "Type B and pass DPOAEs, n = 56", "Fail both, n = 151")
+
+rs.all.possible.df = full.24 # this is the development sample
+rs.all.possible.df$rs.all.possible = with(rs.all.possible.df, 
+                                          ifelse(tymp=="pass" & dpoae=="pass", "Pass both, n = 769", 
+                                                 ifelse(tymp=="pass" & dpoae=="refer", "Type A and fail DPOAEs, n = 35",
+                                                        ifelse(tymp=='type C' & dpoae=='pass', 'Type C and pass DPOAEs, n = 21',
+                                                               ifelse(tymp=="type C" & dpoae=="refer", "Type C and fail DPOAEs, n = 6",
+                                                                      ifelse(tymp=="refer" & dpoae=="pass", "Type B and pass DPOAEs, n = 56",
+                                                                             ifelse(tymp=="refer" & dpoae=="refer", "Fail both, n = 151", NA)
+                                                                             )
+                                                                      )
+                                                               )
+                                                        )
+                                                 )
+                                          )
+
+rs.all.possible.df$rs.all.possible = factor(rs.all.possible.df$rs.all.possible, levels=rs.all.names)
+summary(rs.all.possible.df$rs.all.possible) 
+
+# Group by rs and create mean
+rs.all.possible2 = select(rs.all.possible.df, abs226:abs8000, rs.all.possible)
+rs.all.possible2 <- group_by(rs.all.possible2, rs.all.possible)
+colnames(rs.all.possible2) = c("226.00", "257.33", "280.62", "297.30", "324.21", "343.49", "363.91", "385.55", "408.48", "432.77", "458.50",
+                              "471.94", "500.00", "514.65", "545.25", "561.23", "577.68", "594.60", "629.96", "648.42", "667.42", "686.98",
+                              "707.11", "727.83", "749.15", "771.11", "793.70", "816.96", "840.90", "865.54", "890.90", "917.00", "943.87",
+                              "971.53", "1000.00", "1029.30", "1059.46", "1090.51", "1122.46", "1155.35", "1189.21", "1224.05", "1259.92", 
+                              "1296.84", "1334.84", "1373.95", "1414.21", "1455.65", "1498.31", "1542.21", "1587.40", "1633.92", "1681.79",
+                              "1731.07", "1781.80", "1834.01", "1887.75", "1943.06", "2000.00", "2058.60", "2118.93", "2181.02", "2244.92",
+                              "2310.71", "2378.41", "2448.11", "2519.84", "2593.68", "2669.68", "2747.91", "2828.43", "2911.31", "2996.61",
+                              "3084.42", "3174.80", "3267.83", "3363.59", "3462.15", "3563.59", "3668.02", "3775.50", "3886.13", 
+                              "4000.00", "4117.21", "4237.85", "4362.03", "4489.85", "4621.41", "4756.83", "4896.21", "5039.68", "5187.36",
+                              "5339.36", "5495.81", "5656.85", "5822.61", "5993.23", "6168.84", "6349.60", "6535.66", "6727.17", "6924.29",
+                              "7127.19", "7336.03", "7550.99", "7772.26", "8000.00", "rs.all.possible")
+abs.median <- summarise_all(rs.all.possible2, funs(median)) # use median because some groups are small
+abs.median <- gather(abs.median, Frequency, absorbance, 2:108)
+abs.median$absorbance[abs.median$absorbance < 0] = 0
+# label with the numbers in each group
+abs.rs.all.plot <- ggplot(abs.median) +
+  theme_bw() +
+  scale_colour_manual(values = c("Pass both, n = 769" = "#00BA38", 
+                                 "Type A and fail DPOAEs, n = 35" = "#B79F00", 
+                                 "Type C and pass DPOAEs, n = 21" = "#00BFC4", 
+                                 "Type C and fail DPOAEs, n = 6" = "#619CFF", 
+                                 "Type B and pass DPOAEs, n = 56" = "#F564E3", 
+                                 "Fail both, n = 151" = "#F8766D")) +
+  geom_line(aes(x = as.numeric(Frequency), y = absorbance, group=rs.all.possible, colour = rs.all.possible))  +
+  xlab("Frequency, Hz") +
+  ylab(expression(paste(italic("A")))) +
+  scale_x_log10(expand=c(0, 0), breaks=c(226, 500, 1000, 2000, 4000, 8000))  +
+  scale_y_continuous(expand=c(0, 0), breaks=c(0, 0.2, 0.4, 0.6, 0.8, 1), limits=c(0, 1)) +
+  theme(legend.title=element_blank(), legend.text=element_text(size=10), legend.justification=c(0,1), 
+        legend.position=c(0,1)) +
+  theme(axis.title.y = element_text(vjust = 0.6)) +
+  theme(plot.margin=unit(c(0.5, 0.8, 0.1, 0.5),"lines")) +
+  theme(legend.title=element_blank() ) +
+  #legend.position=c(0.02,0.98)
+  #legend.text=element_text(size=12), 
+  theme(legend.position="right")
+print(abs.rs.all.plot)
+
+# Multiplot
+abs.plots <- plot_grid(abs.mean.plot, abs.rs.all.plot, nrow=2, ncol=1, align = "v", labels = c("A", "B"))
+ggsave("abs.infant.plots.jpeg", abs.plots, height=6, width=8, dpi=500)
 
 # Create the 90% normal range (1/24 octave) for each age group for the example plots and app
 # 6 mth
@@ -837,8 +904,8 @@ max = pred.compare %>%
 max
 
 # examples
-id = "421" 
-ear.side = "R"
+id = "192" 
+ear.side = "L"
 age.group = "18 months"
 
 eg1 = filter(full.2, id.res==id, ear==ear.side, age_group==age.group) 
@@ -868,11 +935,11 @@ freq.num = c(226.00, 257.33, 280.62, 297.30, 324.21, 343.49, 363.91, 385.55, 408
 names(eg.abs1) = freq.num
 eg.abs.long1 <- gather(eg.abs1, Frequency, Absorbance, 1:107)
 eg.abs.long1$Frequency = as.numeric(eg.abs.long1$Frequency)
-
+eg.abs.long1$Absorbance[eg.abs.long1$Absorbance < 0] = 0
 # Right ear 23-mth male with type B and passed DPOAE
 eg.plot.1 = ggplot(eg.abs.long1) +
   scale_x_log10(expand=c(0, 0), breaks=c(226, 500, 1000, 2000, 4000, 8000))  +
-  geom_line(aes(x= Frequency, y=Absorbance), data = eg.abs.long1, colour="red") +
+  geom_line(aes(x= Frequency, y=Absorbance), data = eg.abs.long1, colour="blue") +
   geom_ribbon(data=abs.90.long.18, aes(x = Frequency, ymin = five, ymax = ninety5, linetype=NA), alpha = 0.2, show.legend = F) +
   xlab("Frequency, Hz") +
   ylab(expression(paste(italic("A")))) +
@@ -883,7 +950,7 @@ eg.plot.1 = ggplot(eg.abs.long1) +
   theme(plot.title = element_text(hjust = 0.5)) +
   theme(plot.title = element_text(lineheight=.8, face="bold")) +
   theme(plot.title = element_text(vjust=2)) +
-  annotate("text", x = 250, y = c(0.90), label = ("Right ear of a 23-month-old male"), hjust = 0) +
+  annotate("text", x = 250, y = c(0.90), label = ("Left ear of a 18-month-old male"), hjust = 0) +
   annotate("text", x = 250, y = c(0.80), label = paste("ME \u2265 mild", eg.mild), parse=F, hjust=0) +
   annotate("text", x = 250, y = c(0.70), label = paste("ME \u2265 severe", eg.severe), parse=F, hjust=0) 
   #annotate("text", x = 250, y = c(0.60), label = paste("Normal = ",  prob.ind.norm1), parse=F, hjust=0) +

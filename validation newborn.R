@@ -201,6 +201,6 @@ y <- replace(y, y==1, 0)
 y <- replace(y, y==2, 1)
 
 jpeg("neonate_validate_calibration_plot.jpeg", width = 5, height = 5 , units = 'in', res = 500)
-MyersMisc:::MyCalPlot(pred.test, y, smooth = T, logistic.cal = F, pl=T, riskdist = "predicted", statloc = T,
+MyersMisc:::MyCalPlot(pred.test, y, smooth = T, logistic.cal = F, pl=T, riskdist = F, statloc = T,
                       legendloc=c(0.7,0.3), cex = 1)
 dev.off()
