@@ -280,6 +280,7 @@ abs.mean.long$absorbance[abs.mean.long$absorbance < 0] = 0
 
 abs.mean.plot <- ggplot(abs.mean.long, aes(x=Frequency, y=absorbance, colour=rs, linetype=age)) +
   geom_line()  +
+  theme_bw() +
   xlab("Frequency, Hz") +
   scale_colour_manual(values = c("Normal" = "#00BA38", 
                                  "Mild" = "#619CFF", 
@@ -287,11 +288,10 @@ abs.mean.plot <- ggplot(abs.mean.long, aes(x=Frequency, y=absorbance, colour=rs,
   ylab(expression(paste(italic("A")))) +
   scale_x_log10(expand=c(0, 0), breaks=c(226, 500, 1000, 2000, 4000, 8000))  +
   scale_y_continuous(expand=c(0, 0), breaks=c(0, 0.2, 0.4, 0.6, 0.8, 1), limits=c(0, 1)) +
-  theme(legend.title=element_blank(), legend.text=element_text(size=10), legend.justification=c(0,1), 
-        legend.position=c(0.03, 0.97)) +
+  theme(legend.title=element_blank(), legend.text=element_text(size=10)) +
   theme(axis.title.y = element_text(vjust = 0.6)) +
   theme(plot.margin=unit(c(0.5, 0.8, 0.1, 0.5),"lines")) +
-  theme_bw() +
+  theme(legend.position = 'right', legend.justification = 'top') +
   theme(legend.title=element_blank())
 print(abs.mean.plot)
 #ggsave("mean.plot.jpeg", abs.mean.plot, height=4, width=7.5, dpi=500)
@@ -349,14 +349,13 @@ abs.rs.all.plot <- ggplot(abs.median) +
   ylab(expression(paste(italic("A")))) +
   scale_x_log10(expand=c(0, 0), breaks=c(226, 500, 1000, 2000, 4000, 8000))  +
   scale_y_continuous(expand=c(0, 0), breaks=c(0, 0.2, 0.4, 0.6, 0.8, 1), limits=c(0, 1)) +
-  theme(legend.title=element_blank(), legend.text=element_text(size=10), legend.justification=c(0,1), 
-        legend.position=c(0,1)) +
+  theme(legend.title=element_blank(), legend.text=element_text(size=10), legend.justification=c(0,1)) +
   theme(axis.title.y = element_text(vjust = 0.6)) +
   theme(plot.margin=unit(c(0.5, 0.8, 0.1, 0.5),"lines")) +
   theme(legend.title=element_blank() ) +
   #legend.position=c(0.02,0.98)
   #legend.text=element_text(size=12), 
-  theme(legend.position="right")
+  theme(legend.position=c("right"))
 print(abs.rs.all.plot)
 
 # Multiplot
@@ -904,21 +903,15 @@ max = pred.compare %>%
 max
 
 # examples
+# EG 1
 id = "192" 
 ear.side = "L"
 age.group = "18 months"
 
 eg1 = filter(full.2, id.res==id, ear==ear.side, age_group==age.group) 
-eg.prob.ind1 = round(predict(final_model, eg1, type = "fitted.ind"), 2)
-eg.prob.ind1
 eg.prob.fit1 = round(predict(final_model, eg1, type = "fitted"), 2)
 eg.mild = eg.prob.fit1[1]
 eg.severe = eg.prob.fit1[2]
-prob.ind.norm1 = eg.prob.ind1[1]
-prob.ind.mild1 = eg.prob.ind1[2]
-prob.ind.sev1 = eg.prob.ind1[3]
-prob.fit.mild1 = eg.prob.fit1[1]
-prob.fit.sev1 = eg.prob.fit1[2]
 eg.abs1 = filter(full.24, id.res==id, ear==ear.side, age_group==age.group) 
 eg.abs1 = dplyr::select(eg.abs1, abs226:abs8000)
 freq.num = c(226.00, 257.33, 280.62, 297.30, 324.21, 343.49, 363.91, 385.55, 408.48, 432.77, 458.50,
@@ -950,7 +943,7 @@ eg.plot.1 = ggplot(eg.abs.long1) +
   theme(plot.title = element_text(hjust = 0.5)) +
   theme(plot.title = element_text(lineheight=.8, face="bold")) +
   theme(plot.title = element_text(vjust=2)) +
-  annotate("text", x = 250, y = c(0.90), label = ("Left ear of a 18-month-old male"), hjust = 0) +
+  annotate("text", x = 250, y = c(0.90), label = ("Left ear of an 18-month-old male"), hjust = 0) +
   annotate("text", x = 250, y = c(0.80), label = paste("ME \u2265 mild", eg.mild), parse=F, hjust=0) +
   annotate("text", x = 250, y = c(0.70), label = paste("ME \u2265 severe", eg.severe), parse=F, hjust=0) 
   #annotate("text", x = 250, y = c(0.60), label = paste("Normal = ",  prob.ind.norm1), parse=F, hjust=0) +
@@ -958,7 +951,42 @@ eg.plot.1 = ggplot(eg.abs.long1) +
   #annotate("text", x = 250, y = c(0.40), label = paste("Severe = ",  prob.ind.sev1), parse=F, hjust=0) 
 eg.plot.1
 
-ggsave("eg.plot.jpeg", eg.plot.1, height=4, width=6, dpi=500)
+# EG 2
+id = "421" 
+ear.side = "R"
+age.group = "18 months"
+
+eg2 = filter(full.2, id.res==id, ear==ear.side, age_group==age.group) 
+eg.prob.fit2 = round(predict(final_model, eg2, type = "fitted"), 2)
+eg.mild = eg.prob.fit2[1]
+eg.severe = eg.prob.fit2[2]
+eg.abs1 = filter(full.24, id.res==id, ear==ear.side, age_group==age.group) 
+eg.abs1 = dplyr::select(eg.abs1, abs226:abs8000)
+names(eg.abs1) = freq.num
+eg.abs.long1 <- gather(eg.abs1, Frequency, Absorbance, 1:107)
+eg.abs.long1$Frequency = as.numeric(eg.abs.long1$Frequency)
+eg.abs.long1$Absorbance[eg.abs.long1$Absorbance < 0] = 0
+# Right ear 23-mth male with type B and passed DPOAE
+eg.plot.2 = ggplot(eg.abs.long1) +
+  scale_x_log10(expand=c(0, 0), breaks=c(226, 500, 1000, 2000, 4000, 8000))  +
+  geom_line(aes(x= Frequency, y=Absorbance), data = eg.abs.long1, colour="red") +
+  geom_ribbon(data=abs.90.long.18, aes(x = Frequency, ymin = five, ymax = ninety5, linetype=NA), alpha = 0.2, show.legend = F) +
+  xlab("Frequency, Hz") +
+  ylab(expression(paste(italic("A")))) +
+  scale_y_continuous(expand=c(0, 0), breaks=c(0, 0.2, 0.4, 0.6, 0.8, 1), limits=c(0, 1)) +
+  theme(legend.text=element_text(size=10), legend.justification=c(0,1)) +
+  theme(axis.title.y = element_text(vjust = 0.6)) +
+  theme(plot.margin=unit(c(0.5, 0.8, 0.1, 0.5),"lines")) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.title = element_text(lineheight=.8, face="bold")) +
+  theme(plot.title = element_text(vjust=2)) +
+  annotate("text", x = 250, y = c(0.90), label = ("Right ear of a 23-month-old male"), hjust = 0) +
+  annotate("text", x = 250, y = c(0.80), label = paste("ME \u2265 mild", eg.mild), parse=F, hjust=0) +
+  annotate("text", x = 250, y = c(0.70), label = paste("ME \u2265 severe", eg.severe), parse=F, hjust=0) 
+eg.plot.2
+
+eg.plots <- plot_grid(eg.plot.1, eg.plot.2, nrow=2, ncol=1, align = "v", labels = c("A", "B"))
+ggsave("eg.plots.jpeg", eg.plots, height=6, width=6, dpi=500)
 
 # RCS knot locations - 0.05, 0.275, 0.5, 0.725, and 0.95 percentiles
 knots1k = quantile(training$abs1000, probs = c(0.05, 0.275, 0.5, 0.725, 0.95))
