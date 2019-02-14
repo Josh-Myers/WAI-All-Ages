@@ -494,6 +494,89 @@ print(abs.90.plot)
 # save 90% range for the app
 # saveRDS(abs.90.long.18, "eighteenMth90range.rds")
 
+# 90% range combining all ages
+# 18 mths
+norm.all = full.24
+norm.all = select(norm.all, abs226:abs8000, rs)
+norm.all <- group_by(norm.all, rs)
+abs.median <- summarise_all(norm.all, funs(median))
+abs.05 <- summarise_all(norm.all, funs(quantile(., probs = (0.05))))
+abs.95 <- summarise_all(norm.all, funs(quantile(., probs = (0.95))))
+abs.90 <- rbind(abs.median, abs.05, abs.95)
+abs.90 <- data.frame(abs.90)
+colnames(abs.90) <- abs.colnames
+stats.col <- c("median", "median", "median", "five", "five", "five", "ninety5", "ninety5", "ninety5")
+abs.90 <- cbind.data.frame(abs.90, stats.col)
+abs.90.long.all <- gather(abs.90, Frequency, absorbance, 2:108)
+abs.90.long.all$absorbance[abs.90.long.all$absorbance < 0] = 0
+abs.90.long.all <- spread(abs.90.long.all, stats.col, absorbance)
+abs.90.long.all$Frequency <- as.numeric(abs.90.long.all$Frequency)
+abs.90.long.all$rs = as.character(abs.90.long.all$rs)
+
+# filter normal
+abs.90.long.all = filter(abs.90.long.all, rs == 'Normal')
+
+# plot to check it looks right
+abs.90.plot <- ggplot(abs.90.long.all, aes(x=Frequency, y=median, ymin=five, ymax=ninety5)) +
+  geom_ribbon(linetype=0, alpha = 0.4) +
+  scale_fill_grey(start=0.6, end=0.2) +
+  geom_line(size=0.8)  +
+  xlab("Frequency, Hz") +
+  ylab("Absorbance") +
+  scale_x_log10(expand=c(0, 0), breaks=c(226, 500, 1000, 2000, 4000, 8000))  +
+  scale_y_continuous(expand=c(0, 0), breaks=c(0, 0.2, 0.4, 0.6, 0.8, 1), limits=c(0, 1)) +
+  theme(legend.title=element_blank(), legend.text=element_text(size=10), legend.justification=c(0,1), 
+        legend.position=c(0.03, 0.97)) +
+  theme(axis.title.y = element_text(vjust = 0.6)) +
+  theme(plot.margin=unit(c(0.5, 0.8, 0.1, 0.5),"lines")) 
+#theme(legend.position="none")
+print(abs.90.plot)
+
+# save 90% range for the app
+# saveRDS(abs.90.long.all, "SixTo18Mth90range.rds")
+
+# need at 1/2 ocatve as well for manual data entry
+
+norm.2 = full.2
+norm.2 = ungroup(norm.2)
+norm.2 = select(norm.2, abs250:abs8000, rs)
+norm.2 <- group_by(norm.2, rs)
+abs.median <- summarise_all(norm.2, funs(median))
+abs.05 <- summarise_all(norm.2, funs(quantile(., probs = (0.05))))
+abs.95 <- summarise_all(norm.2, funs(quantile(., probs = (0.95))))
+abs.90 <- rbind(abs.median, abs.05, abs.95)
+abs.90 <- data.frame(abs.90)
+colnames(abs.90) <- c('rs', '250', '354', '500', '707', '1000', '1414', '2000', '2828', '4000', '5657', '8000')
+stats.col <- c("median", "median", "median", "five", "five", "five", "ninety5", "ninety5", "ninety5")
+abs.90 <- cbind.data.frame(abs.90, stats.col)
+abs.90.long.2 <- gather(abs.90, Frequency, absorbance, 2:12)
+abs.90.long.2$absorbance[abs.90.long.2$absorbance < 0] = 0
+abs.90.long.2 <- spread(abs.90.long.2, stats.col, absorbance)
+abs.90.long.2$Frequency <- as.numeric(abs.90.long.2$Frequency)
+abs.90.long.2$rs = as.character(abs.90.long.2$rs)
+
+# filter normal
+abs.90.long.2 = filter(abs.90.long.2, rs == 'Normal')
+
+# plot to check it looks right
+abs.90.plot <- ggplot(abs.90.long.2, aes(x=Frequency, y=median, ymin=five, ymax=ninety5)) +
+  geom_ribbon(linetype=0, alpha = 0.4) +
+  scale_fill_grey(start=0.6, end=0.2) +
+  geom_line(size=0.8)  +
+  xlab("Frequency, Hz") +
+  ylab("Absorbance") +
+  scale_x_log10(expand=c(0, 0), breaks=c(226, 500, 1000, 2000, 4000, 8000))  +
+  scale_y_continuous(expand=c(0, 0), breaks=c(0, 0.2, 0.4, 0.6, 0.8, 1), limits=c(0, 1)) +
+  theme(legend.title=element_blank(), legend.text=element_text(size=10), legend.justification=c(0,1), 
+        legend.position=c(0.03, 0.97)) +
+  theme(axis.title.y = element_text(vjust = 0.6)) +
+  theme(plot.margin=unit(c(0.5, 0.8, 0.1, 0.5),"lines")) 
+#theme(legend.position="none")
+print(abs.90.plot)
+
+# save 90% range for the app
+# saveRDS(abs.90.long.2, "SixTo18Mth90range2.rds")
+
 # modeling
 # calibration plot function for the test set----
 my.val.prob = function (p, y, logit, group, weights = rep(1, length(y)), normwt = FALSE, 
@@ -786,10 +869,15 @@ gammas = rbind(base_gamma, base_gamma.nl, age_gamma, age_nl.gamma, age_semi.nl.g
 
 final_model = base_model.no34k.r
 
+# Save the model the first time
+# saveRDS(final_model, 'InfantModel.rds')
+
+# load model for subsequent use 
+final_model = readRDS('InfantModel.rds')
+
 # save equation and model
 options(prType = 'plain') # change to "latex" if want latex output
 latex(final_model, file = "") # replace "abs" with: \textit{A}  and paste into Rsweave file then compile pdf
-saveRDS(final_model, 'InfantModel.rds')
 
 # explore/interpret final model 
 anova(final_model)
@@ -993,3 +1081,4 @@ knots1k = quantile(training$abs1000, probs = c(0.05, 0.275, 0.5, 0.725, 0.95))
 knots1.4k = quantile(training$abs1414, probs = c(0.05, 0.275, 0.5, 0.725, 0.95))
 knots2k = quantile(training$abs2000, probs = c(0.05, 0.275, 0.5, 0.725, 0.95))
 knots6k = quantile(training$abs5657, probs = c(0.05, 0.275, 0.5, 0.725, 0.95))
+
